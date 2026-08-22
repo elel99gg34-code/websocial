@@ -85,7 +85,11 @@ code{background:var(--soft);padding:1px 5px;border-radius:5px;font-size:13px}
   <div style="margin-top:10px"><label>API 키</label>
     <input type="password" id="s-key" style="width:100%" placeholder="sk-ant-... / AIza..."></div>
   <div style="margin-top:10px"><label>모델</label>
-    <input type="text" id="s-model" style="width:100%"></div>
+    <div class="row" style="flex-wrap:nowrap">
+      <input type="text" id="s-model" list="modelList" style="flex:1">
+      <button class="ghost tiny" id="btnModels" title="이 키로 쓸 수 있는 모델 목록을 불러옵니다">모델 목록</button>
+    </div>
+    <datalist id="modelList"></datalist></div>
   <div style="margin-top:10px" id="baseUrlWrap"><label>Base URL (OpenAI 호환일 때)</label>
     <input type="text" id="s-baseurl" style="width:100%"></div>
   <p class="muted" style="font-size:12px;margin-top:12px">
@@ -138,28 +142,38 @@ const nowIso = () => new Date().toISOString();
 /* ── 제공자 ──────────────────────────────────────────────────── */
 const PROVIDERS = {
   anthropic: {
-    label: "Anthropic Claude (권장 · 품질 최상)",
-    defaultModel: "claude-opus-5",
-    keyUrl: "https://console.anthropic.com/",
-    browserOk: true,
-    note: "브라우저에서 직접 호출됨을 확인했습니다. 한국어 장문 품질이 가장 좋습니다.",
+    kind: "anthropic", label: "Anthropic Claude — 품질 최상 (브라우저 호출 확인됨)",
+    defaultModel: "claude-opus-5", keyUrl: "https://console.anthropic.com/",
+    note: "브라우저에서 직접 호출되는 것을 확인했습니다. 한국어 장문 품질이 가장 좋아 집필에 권장합니다.",
+  },
+  groq: {
+    kind: "openai", label: "Groq — 무료 티어 · 매우 빠름", baseUrl: "https://api.groq.com/openai/v1",
+    defaultModel: "llama-3.3-70b-versatile", keyUrl: "https://console.groq.com/keys",
+    note: "무료 티어가 있고 추론이 매우 빠릅니다. 브라우저 직접 호출 가능 여부는 확인하지 못했으니 아래 ‘연결 테스트’로 먼저 확인하세요.",
+  },
+  xai: {
+    kind: "openai", label: "xAI Grok", baseUrl: "https://api.x.ai/v1",
+    defaultModel: "grok-4", keyUrl: "https://console.x.ai/",
+    note: "OpenAI 호환 API 입니다. 모델명이 자주 바뀌니 ‘모델 목록’ 버튼으로 실제 쓸 수 있는 이름을 확인하세요.",
   },
   gemini: {
-    label: "Google Gemini (무료 티어)",
-    defaultModel: "gemini-2.5-flash",
+    kind: "gemini", label: "Google Gemini — 무료 티어", defaultModel: "gemini-2.5-flash",
     keyUrl: "https://aistudio.google.com/apikey",
-    browserOk: null,
-    note: "무료 티어가 있습니다. 브라우저 직접 호출은 제공자 정책에 따라 막힐 수 있으니 ‘연결 테스트’로 먼저 확인하세요.",
+    note: "무료 티어가 있습니다. 브라우저 직접 호출 가능 여부는 확인하지 못했으니 ‘연결 테스트’로 먼저 확인하세요.",
   },
-  openai: {
-    label: "OpenAI 호환 (OpenRouter · Groq · Ollama 등)",
-    defaultModel: "deepseek/deepseek-chat-v3-0324:free",
-    defaultBaseUrl: "https://openrouter.ai/api/v1",
-    keyUrl: "https://openrouter.ai/keys",
-    browserOk: null,
-    note: "Base URL 만 바꾸면 Groq·Cerebras·로컬 Ollama(http://localhost:11434/v1) 도 됩니다. ‘연결 테스트’로 먼저 확인하세요.",
+  openrouter: {
+    kind: "openai", label: "OpenRouter — :free 모델은 무료", baseUrl: "https://openrouter.ai/api/v1",
+    defaultModel: "deepseek/deepseek-chat-v3-0324:free", keyUrl: "https://openrouter.ai/keys",
+    note: "키 하나로 여러 공급자를 씁니다. 모델명에 :free 가 붙은 것은 무료입니다.",
+  },
+  custom: {
+    kind: "openai", label: "직접 입력 — Ollama · LM Studio · 기타 OpenAI 호환",
+    baseUrl: "http://localhost:11434/v1", defaultModel: "qwen2.5:14b", keyUrl: "https://ollama.com/",
+    note: "로컬 모델은 완전 무료입니다. Ollama 는 `OLLAMA_ORIGINS=* ollama serve` 로 띄워야 브라우저에서 호출됩니다.",
   },
 };
+const kindOf = (id) => (PROVIDERS[id] || PROVIDERS.anthropic).kind;
+const baseUrlOf = (cfg) => (cfg.baseUrl || (PROVIDERS[cfg.provider] || {}).baseUrl || "").replace(/\/+$/, "");
 
 /* ── 프롬프트 ────────────────────────────────────────────────── */
 const P = {};
@@ -517,13 +531,14 @@ function friendlyError(err, provider) {
 /** 한 번 호출한다. stream 이면 onDelta 로 조각을 흘려보낸다. */
 async function callModel({ system, user, maxTokens = 16000, onDelta = null }) {
   const cfg = loadSettings();
-  if (!cfg.key && cfg.provider !== "openai") throw new Error("설정에서 API 키를 먼저 넣으세요.");
+  if (!cfg.key && !/localhost|127\.0\.0\.1/.test(baseUrlOf(cfg))) throw new Error("설정에서 API 키를 먼저 넣으세요.");
   abortController = new AbortController();
   const signal = abortController.signal;
   const blocks = system.filter((s) => s && s.trim());
   let url, headers, body, pickDelta, pickUsage;
 
-  if (cfg.provider === "anthropic") {
+  const kind = kindOf(cfg.provider);
+  if (kind === "anthropic") {
     url = "https://api.anthropic.com/v1/messages";
     headers = {
       "content-type": "application/json",
@@ -545,7 +560,7 @@ async function callModel({ system, user, maxTokens = 16000, onDelta = null }) {
     pickUsage = (d) =>
       d.type === "message_start" ? { in: d.message.usage.input_tokens, cacheRead: d.message.usage.cache_read_input_tokens || 0 }
       : d.type === "message_delta" && d.usage ? { out: d.usage.output_tokens } : null;
-  } else if (cfg.provider === "gemini") {
+  } else if (kind === "gemini") {
     url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(cfg.model)}:streamGenerateContent?alt=sse`;
     headers = { "content-type": "application/json", "x-goog-api-key": cfg.key };
     body = {
@@ -559,7 +574,7 @@ async function callModel({ system, user, maxTokens = 16000, onDelta = null }) {
     };
     pickUsage = (d) => (d.usageMetadata ? { in: d.usageMetadata.promptTokenCount || 0, out: d.usageMetadata.candidatesTokenCount || 0 } : null);
   } else {
-    const base = (cfg.baseUrl || "https://openrouter.ai/api/v1").replace(/\/+$/, "");
+    const base = baseUrlOf(cfg) || "https://openrouter.ai/api/v1";
     url = `${base}/chat/completions`;
     headers = { "content-type": "application/json" };
     if (cfg.key) headers["authorization"] = `Bearer ${cfg.key}`;
@@ -582,7 +597,7 @@ async function callModel({ system, user, maxTokens = 16000, onDelta = null }) {
     res = await fetch(url, { method: "POST", headers, body: JSON.stringify(body), signal });
   } catch (err) {
     if (err.name === "AbortError") throw err;
-    throw new Error(friendlyError(err, PROVIDERS[cfg.provider].label));
+    throw new Error(friendlyError(err, (PROVIDERS[cfg.provider] || {}).label || cfg.provider));
   }
   if (!res.ok) {
     const text = await res.text();
@@ -1176,16 +1191,16 @@ function syncSettingsForm() {
   $("s-provider").value = cfg.provider;
   $("s-key").value = cfg.key;
   $("s-model").value = cfg.model || v.defaultModel;
-  $("s-baseurl").value = cfg.baseUrl || v.defaultBaseUrl || "";
-  $("baseUrlWrap").style.display = cfg.provider === "openai" ? "" : "none";
+  $("s-baseurl").value = cfg.baseUrl || v.baseUrl || "";
+  $("baseUrlWrap").style.display = kindOf(cfg.provider) === "openai" ? "" : "none";
   $("corsNotice").innerHTML = `<strong>${v.label}</strong><br>${v.note}<br>키 발급: <a href="${v.keyUrl}" target="_blank" rel="noopener">${v.keyUrl}</a>`;
 }
 $("btnSettings").onclick = () => { fillProviderSelect(); syncSettingsForm(); $("testResult").textContent = ""; $("dlgSettings").showModal(); };
 $("s-provider").onchange = (e) => {
   const v = PROVIDERS[e.target.value];
   $("s-model").value = v.defaultModel;
-  $("s-baseurl").value = v.defaultBaseUrl || "";
-  $("baseUrlWrap").style.display = e.target.value === "openai" ? "" : "none";
+  $("s-baseurl").value = v.baseUrl || "";
+  $("baseUrlWrap").style.display = kindOf(e.target.value) === "openai" ? "" : "none";
   $("corsNotice").innerHTML = `<strong>${v.label}</strong><br>${v.note}<br>키 발급: <a href="${v.keyUrl}" target="_blank" rel="noopener">${v.keyUrl}</a>`;
 };
 const readSettingsForm = () => ({ provider: $("s-provider").value, key: $("s-key").value.trim(), model: $("s-model").value.trim(), baseUrl: $("s-baseurl").value.trim() });
@@ -1199,6 +1214,41 @@ $("btnTest").onclick = async () => {
     $("testResult").innerHTML = `<span style="color:var(--ok)">성공 — 모델 응답: ${out.slice(0, 40)}</span>`;
   } catch (e) {
     $("testResult").innerHTML = `<span style="color:var(--err)">${String(e.message).replace(/\n/g, "<br>")}</span>`;
+  }
+};
+
+async function fetchModels() {
+  const cfg = readSettingsForm();
+  const kind = kindOf(cfg.provider);
+  let url, headers = {};
+  if (kind === "anthropic") {
+    url = "https://api.anthropic.com/v1/models?limit=100";
+    headers = { "x-api-key": cfg.key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" };
+  } else if (kind === "gemini") {
+    url = "https://generativelanguage.googleapis.com/v1beta/models";
+    headers = { "x-goog-api-key": cfg.key };
+  } else {
+    url = `${(cfg.baseUrl || PROVIDERS[cfg.provider].baseUrl || "").replace(/\/+$/, "")}/models`;
+    if (cfg.key) headers["authorization"] = `Bearer ${cfg.key}`;
+  }
+  const res = await fetch(url, { headers });
+  if (!res.ok) throw new Error(`HTTP ${res.status} — ${(await res.text()).slice(0, 200)}`);
+  const j = await res.json();
+  const ids = (j.data || j.models || []).map((m) => String(m.id || m.name || "").replace(/^models\//, "")).filter(Boolean);
+  if (!ids.length) throw new Error("모델 목록이 비어 있습니다.");
+  return ids.sort();
+}
+$("btnModels").onclick = async () => {
+  $("testResult").textContent = "모델 목록 불러오는 중…";
+  try {
+    const ids = await fetchModels();
+    const dl = $("modelList");
+    dl.innerHTML = "";
+    for (const id of ids) dl.append(el("option", { value: id }));
+    $("testResult").innerHTML = `<span style="color:var(--ok)">모델 ${ids.length}개를 찾았습니다. 모델 칸을 클릭하면 목록이 뜹니다.</span><br>` +
+      `<span class="muted" style="font-size:12px">${ids.slice(0, 12).join(", ")}${ids.length > 12 ? " …" : ""}</span>`;
+  } catch (e) {
+    $("testResult").innerHTML = `<span style="color:var(--err)">모델 목록 실패 — ${String(e.message).replace(/\n/g, "<br>")}</span>`;
   }
 };
 

@@ -67,6 +67,17 @@ export const PRESETS: Preset[] = [
     note: "모델명에 :free 접미사가 붙은 모델은 무료. 여러 공급자를 키 하나로 사용.",
   },
   {
+    id: "xai",
+    label: "xAI Grok",
+    kind: "openai-compat",
+    baseUrl: "https://api.x.ai/v1",
+    apiKeyEnv: "XAI_API_KEY",
+    defaultModel: "grok-4",
+    tier: "paid",
+    signupUrl: "https://console.x.ai/",
+    note: "OpenAI 호환. 모델명이 자주 바뀌므로 공식 문서에서 확인 후 project.json 에서 바꾸세요.",
+  },
+  {
     id: "cerebras",
     label: "Cerebras",
     kind: "openai-compat",
