@@ -76,7 +76,7 @@ code{background:var(--soft);padding:1px 5px;border-radius:5px;font-size:13px}
 </head>
 <body>
 <header>
-  <h1>websocial <small>자동화 웹소설 · 단독 실행판</small></h1>
+  <h1>websocial <small id="verLabel">자동화 웹소설 · 단독 실행판</small></h1>
   <select id="picker" title="작품 선택"></select>
   <button class="ghost tiny" id="btnNew">새 작품</button>
   <div class="spacer"></div>
@@ -125,6 +125,7 @@ code{background:var(--soft);padding:1px 5px;border-radius:5px;font-size:13px}
  * 데이터는 이 브라우저의 localStorage 에만 저장된다.
  * ════════════════════════════════════════════════════════════════ */
 
+const VERSION = "v5 · 2026-08-22";
 const $ = (id) => document.getElementById(id);
 const el = (tag, props = {}, ...kids) => {
   const n = Object.assign(document.createElement(tag), props);
@@ -1318,8 +1319,23 @@ function providerRow(id, entry, active) {
           res.textContent = `성공 — 모델 응답: ${out.slice(0, 40)}`;
         } catch (err) {
           res.className = "res"; res.style.color = "var(--err)";
-          res.innerHTML = String(err.message).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/\n/g, "<br>");
+          res.innerHTML = String(err.message).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/\n/g, "<br>")
+            + "<br><br>원인을 확인하는 중…";
+          try {
+            const d = await diagnose(rowConfig(row));
+            res.innerHTML = `<strong>진단 결과</strong><br>${d.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/\n/g, "<br>")}`;
+          } catch (e2) { res.innerHTML += "<br>(진단 실패: " + e2.message + ")"; }
         } finally { btn.disabled = false; }
+      } }),
+      el("button", { className: "ghost tiny", textContent: "진단", title: "무엇이 막는지 단계별로 확인합니다", onclick: async (e) => {
+        const btn = e.target; btn.disabled = true;
+        res.className = "res muted"; res.style.color = "";
+        res.textContent = "진단 중…";
+        try {
+          const d = await diagnose(rowConfig(row));
+          res.innerHTML = `<strong>진단 결과</strong><br>${d.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/\n/g, "<br>")}`;
+        } catch (err) { res.textContent = "진단 실패: " + err.message; }
+        finally { btn.disabled = false; }
       } }),
       el("button", { className: "ghost tiny", textContent: "모델 목록", onclick: async (e) => {
         const btn = e.target; btn.disabled = true;
@@ -1379,6 +1395,71 @@ async function fetchModels(cfg) {
   return ids.sort();
 }
 
+/**
+ * 왜 실패하는지 단계적으로 좁힌다.
+ * 인터넷 → 서버 도달 → 브라우저 허용(CORS) → 키 순서로 확인한다.
+ */
+async function diagnose(cfg) {
+  const kind = kindOf(cfg.provider);
+  const name = PROVIDERS[cfg.provider].label.split(" — ")[0];
+  const base = baseUrlOf(cfg);
+  const listUrl = kind === "anthropic" ? "https://api.anthropic.com/v1/models"
+    : kind === "gemini" ? "https://generativelanguage.googleapis.com/v1beta/models"
+    : `${base}/models`;
+  const authed = kind === "anthropic"
+    ? { url: listUrl, headers: { "x-api-key": cfg.key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" } }
+    : kind === "gemini"
+      ? { url: `${listUrl}?key=${encodeURIComponent(cfg.key)}`, headers: {} }
+      : { url: listUrl, headers: cfg.key ? { authorization: `Bearer ${cfg.key}` } : {} };
+
+  const lines = [];
+  const isSafari = /^((?!chrome|android|crios|fxios).)*safari/i.test(navigator.userAgent);
+
+  // 1) 서버까지 패킷이 가는가 (no-cors 는 CORS 와 무관하게 도달 여부만 본다)
+  let reached = false;
+  try { await fetch(listUrl, { mode: "no-cors" }); reached = true; } catch { reached = false; }
+  lines.push(`1. ${name} 서버 도달: ${reached ? "성공" : "실패"}`);
+  if (!reached) {
+    lines.push("", "→ 인터넷 연결이나 방화벽 문제입니다. 이 제공자와 통신 자체가 안 됩니다.",
+      "   회사·학교 네트워크나 백신·확장 프로그램이 막는 경우가 많습니다.",
+      "   다른 네트워크(휴대폰 핫스팟 등)에서 한 번 시도해 보세요.");
+    return lines.join("\n");
+  }
+
+  // 2) 브라우저 요청을 허용하는가 (CORS)
+  let status = 0, corsOk = false, body = "";
+  try {
+    const r = await fetch(authed.url, { headers: authed.headers });
+    corsOk = true; status = r.status;
+    body = (await r.text()).slice(0, 300);
+  } catch (e) { corsOk = false; body = e.message; }
+  lines.push(`2. 브라우저 직접 호출 허용(CORS): ${corsOk ? "허용됨" : "거부됨"}`);
+  if (!corsOk) {
+    lines.push("", `→ ${name} 는 브라우저에서 오는 요청을 거부합니다. 키와 무관합니다.`,
+      "   이 제공자는 이 HTML 파일로는 쓸 수 없습니다.", "",
+      "   해결책", "   · Anthropic Claude 로 바꾸세요(브라우저 호출 허용을 확인했습니다).",
+      "   · 로컬 Ollama 는 OLLAMA_ORIGINS=* 로 띄우면 됩니다.",
+      "   · 이 제공자를 꼭 써야 하면 서버판(novel serve)에서 쓰세요. 거기선 제한이 없습니다.");
+    if (isSafari) lines.push("", "   · Safari 는 로컬 파일에서의 통신을 특히 강하게 막습니다. Chrome 으로 열어보세요.");
+    return lines.join("\n");
+  }
+
+  // 3) 키가 맞는가
+  lines.push(`3. 서버 응답: HTTP ${status}`);
+  if (status === 401 || status === 403) {
+    lines.push("", "→ 통신은 되는데 키가 거부됐습니다. 키를 다시 확인하세요.",
+      "   앞뒤 공백이나 줄바꿈이 섞이지 않았는지, 결제·활성화가 끝난 키인지 보세요.", "", `서버 응답: ${body}`);
+  } else if (status === 404) {
+    lines.push("", "→ 주소나 모델 이름이 틀렸습니다. Base URL 을 확인하세요.", "", `서버 응답: ${body}`);
+  } else if (status >= 200 && status < 300) {
+    lines.push("", "→ 연결과 인증 모두 정상입니다. 여기서 실패한다면 모델 이름 문제일 수 있으니",
+      "   ‘모델 목록’ 버튼으로 쓸 수 있는 이름을 받아 모델 칸에 넣으세요.");
+  } else {
+    lines.push("", `→ 예상치 못한 응답입니다.`, "", `서버 응답: ${body}`);
+  }
+  return lines.join("\n");
+}
+
 $("btnSettings").onclick = () => { renderProviderRows(); $("dlgSettings").showModal(); };
 $("btnSaveSettings").onclick = () => { saveStore(collectRows()); $("dlgSettings").close(); };
 $("btnCloseSettings").onclick = () => $("dlgSettings").close();
@@ -1411,6 +1492,7 @@ $("btnCreate").onclick = () => {
 $("picker").onchange = (e) => { state.id = e.target.value; state.episode = null; render(); };
 window.addEventListener("beforeunload", (e) => { if (state.running) { e.preventDefault(); e.returnValue = ""; } });
 
+$("verLabel").textContent = `자동화 웹소설 · 단독 실행판 ${VERSION}`;
 refreshPicker();
 render();
 </script>
