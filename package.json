@@ -14,7 +14,7 @@
     "check": "npm run typecheck && npm test"
   },
   "engines": {
-    "node": ">=22.6"
+    "node": ">=22.18"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.120.0",

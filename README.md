@@ -124,6 +124,7 @@ npm test            # node --test (40개, 네트워크 불필요)
 npm run check       # 둘 다
 ```
 
-- Node 22.6+ 의 네이티브 타입 스트리핑으로 **빌드 단계 없이** `node src/cli.ts` 가 바로 돈다.
+- **Node 22.18 이상**이 필요하다. 네이티브 타입 스트리핑으로 빌드 단계 없이 `node src/cli.ts` 가 바로 돈다.
+  (22.6~22.17 은 `node --experimental-strip-types src/cli.ts` 로 실행해야 한다.)
 - 런타임 의존성은 `@anthropic-ai/sdk` 와 `zod` 둘뿐이다.
 - 무료 제공자 어댑터는 로컬 스텁 서버로 실제 HTTP 왕복을 테스트한다(API 키 불필요).
