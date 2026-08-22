@@ -1,0 +1,1231 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>websocial — 자동화 웹소설 (단독 실행)</title>
+<style>
+:root{
+  --bg:#faf9f7; --panel:#fff; --line:#e4e0d8; --text:#1c1a17; --muted:#6d675e;
+  --accent:#8a5a2b; --soft:#f3ece3; --ok:#2f6b46; --warn:#9a6a12; --err:#a33a2a;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#16151a;--panel:#1e1d23;--line:#33313a;--text:#e9e6e1;--muted:#9b958c;
+    --accent:#d9a441;--soft:#2a2620;--ok:#63b184;--warn:#d9a441;--err:#e0705c}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.65 -apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","Malgun Gothic",sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+header{position:sticky;top:0;z-index:5;display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+  padding:11px 18px;background:var(--panel);border-bottom:1px solid var(--line)}
+header h1{margin:0;font-size:16px;letter-spacing:-.02em}
+header h1 small{color:var(--muted);font-weight:400;font-size:12px;margin-left:6px}
+.spacer{flex:1}
+select,input[type=text],input[type=password],input[type=number],textarea{
+  background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 10px;max-width:100%}
+textarea{width:100%;font:15px/2 inherit;resize:vertical}
+button{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:8px 14px;cursor:pointer}
+button.ghost{background:transparent;color:var(--accent);border:1px solid var(--line)}
+button.tiny{padding:4px 10px;font-size:13px}
+button:disabled{opacity:.45;cursor:not-allowed}
+main{max-width:1100px;margin:0 auto;padding:18px}
+nav{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
+nav button{background:transparent;color:var(--muted);border-radius:8px;padding:7px 13px}
+nav button.on{background:var(--soft);color:var(--accent);font-weight:600}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:17px;margin-bottom:15px}
+.card h2{margin:0 0 11px;font-size:15px}
+.card h3{margin:15px 0 6px;font-size:14px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(185px,1fr))}
+label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;color:var(--muted)}
+tbody tr.click{cursor:pointer}
+tbody tr.click:hover{background:var(--soft)}
+.tag{display:inline-block;white-space:nowrap;padding:2px 8px;border-radius:99px;font-size:12px;background:var(--soft);color:var(--muted)}
+.tag.ok{color:var(--ok)}.tag.warn{color:var(--warn)}.tag.err{color:var(--err)}
+.muted{color:var(--muted)}
+.stat{font-size:23px;font-weight:600;letter-spacing:-.02em}
+.log{background:#0d0d10;color:#d7d3cc;border-radius:10px;padding:13px;height:220px;overflow:auto;
+  font:12.5px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;word-break:break-all}
+.log .step{color:#6fc3e8}.log .ok{color:#7fd6a0}.log .warn{color:#e8c56f}.log .error{color:#f08a76}
+.bar{height:6px;border-radius:99px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent);transition:width .3s}
+.split{display:grid;gap:15px;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr)}
+@media(max-width:880px){.split{grid-template-columns:1fr}}
+.stream{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px;
+  max-height:320px;overflow:auto;white-space:pre-wrap;line-height:2;font-size:14px}
+.err-box{border-left:3px solid var(--err);padding-left:11px;margin:8px 0;font-size:13px}
+.overflow{overflow-x:auto}
+dialog{border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--text);
+  padding:20px;max-width:600px;width:93vw}
+dialog::backdrop{background:rgba(0,0,0,.5)}
+.notice{background:var(--soft);border-radius:10px;padding:12px 14px;font-size:13px;line-height:1.7}
+code{background:var(--soft);padding:1px 5px;border-radius:5px;font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <h1>websocial <small>자동화 웹소설 · 단독 실행판</small></h1>
+  <select id="picker" title="작품 선택"></select>
+  <button class="ghost tiny" id="btnNew">새 작품</button>
+  <div class="spacer"></div>
+  <span id="statusBadge" class="tag"></span>
+  <button class="ghost tiny" id="btnSettings">설정</button>
+</header>
+<main id="app"></main>
+
+<dialog id="dlgSettings">
+  <h2 style="margin-top:0">API 설정</h2>
+  <div class="notice" id="corsNotice"></div>
+  <div style="margin-top:12px"><label>제공자</label>
+    <select id="s-provider" style="width:100%"></select></div>
+  <div style="margin-top:10px"><label>API 키</label>
+    <input type="password" id="s-key" style="width:100%" placeholder="sk-ant-... / AIza..."></div>
+  <div style="margin-top:10px"><label>모델</label>
+    <input type="text" id="s-model" style="width:100%"></div>
+  <div style="margin-top:10px" id="baseUrlWrap"><label>Base URL (OpenAI 호환일 때)</label>
+    <input type="text" id="s-baseurl" style="width:100%"></div>
+  <p class="muted" style="font-size:12px;margin-top:12px">
+    키는 이 브라우저에만 저장됩니다(localStorage). 이 HTML 파일 안에는 들어가지 않으니
+    파일을 남에게 줘도 키는 따라가지 않습니다.</p>
+  <p id="testResult" style="font-size:13px"></p>
+  <div class="row" style="margin-top:12px;justify-content:flex-end">
+    <button class="ghost" id="btnTest">연결 테스트</button>
+    <button class="ghost" id="btnCloseSettings">닫기</button>
+    <button id="btnSaveSettings">저장</button>
+  </div>
+</dialog>
+
+<dialog id="dlgNew">
+  <h2 style="margin-top:0">새 작품</h2>
+  <div><label>한 줄 아이디어 (필수)</label>
+    <input type="text" id="n-idea" style="width:100%" placeholder="재벌가 망나니가 파산 직전으로 회귀해 그룹을 재건한다"></div>
+  <div class="grid" style="margin-top:11px">
+    <div><label>제목</label><input type="text" id="n-title" placeholder="회귀한 망나니 도련님"></div>
+    <div><label>장르</label><input type="text" id="n-genre" value="현대판타지"></div>
+    <div><label>플랫폼</label><input type="text" id="n-platform" value="문피아"></div>
+    <div><label>독자층</label><input type="text" id="n-reader" value="20~40대 남성 독자"></div>
+    <div><label>총 회차</label><input type="number" id="n-episodes" value="20" min="1"></div>
+    <div><label>회차 글자수</label><input type="number" id="n-chars" value="5200" min="800"></div>
+  </div>
+  <p id="newError" class="muted" style="font-size:13px"></p>
+  <div class="row" style="margin-top:12px;justify-content:flex-end">
+    <button class="ghost" id="btnCancelNew">취소</button>
+    <button id="btnCreate">만들기</button>
+  </div>
+</dialog>
+
+<script>
+"use strict";
+/* ════════════════════════════════════════════════════════════════
+ * websocial 단독 실행판
+ * 서버·설치 없이 브라우저에서 웹소설 연재를 자동 생성한다.
+ * 데이터는 이 브라우저의 localStorage 에만 저장된다.
+ * ════════════════════════════════════════════════════════════════ */
+
+const $ = (id) => document.getElementById(id);
+const el = (tag, props = {}, ...kids) => {
+  const n = Object.assign(document.createElement(tag), props);
+  for (const k of kids.flat()) if (k != null && k !== false) n.append(k);
+  return n;
+};
+const num = (v) => Number(v ?? 0).toLocaleString("ko-KR");
+const nowIso = () => new Date().toISOString();
+
+/* ── 제공자 ──────────────────────────────────────────────────── */
+const PROVIDERS = {
+  anthropic: {
+    label: "Anthropic Claude (권장 · 품질 최상)",
+    defaultModel: "claude-opus-5",
+    keyUrl: "https://console.anthropic.com/",
+    browserOk: true,
+    note: "브라우저에서 직접 호출됨을 확인했습니다. 한국어 장문 품질이 가장 좋습니다.",
+  },
+  gemini: {
+    label: "Google Gemini (무료 티어)",
+    defaultModel: "gemini-2.5-flash",
+    keyUrl: "https://aistudio.google.com/apikey",
+    browserOk: null,
+    note: "무료 티어가 있습니다. 브라우저 직접 호출은 제공자 정책에 따라 막힐 수 있으니 ‘연결 테스트’로 먼저 확인하세요.",
+  },
+  openai: {
+    label: "OpenAI 호환 (OpenRouter · Groq · Ollama 등)",
+    defaultModel: "deepseek/deepseek-chat-v3-0324:free",
+    defaultBaseUrl: "https://openrouter.ai/api/v1",
+    keyUrl: "https://openrouter.ai/keys",
+    browserOk: null,
+    note: "Base URL 만 바꾸면 Groq·Cerebras·로컬 Ollama(http://localhost:11434/v1) 도 됩니다. ‘연결 테스트’로 먼저 확인하세요.",
+  },
+};
+
+/* ── 프롬프트 ────────────────────────────────────────────────── */
+const P = {};
+
+P.style = (p) => `너는 한국 웹소설 전문 작가다. 아래 원칙을 어기지 않는다.
+
+## 작품 기본값
+- 장르: ${p.genre} / 연재 플랫폼: ${p.platform}
+- 시점: 3인칭 제한적 시점 / 시제: 과거 시제
+- 주요 독자: ${p.reader}
+
+## 문장 원칙
+1. 모바일 화면 기준으로 쓴다. 한 문단은 1~3문장, 대체로 세 줄을 넘기지 않는다.
+2. 설명하지 말고 보여준다. 감정을 이름 붙이는 대신 행동·대사·감각으로 드러낸다.
+3. 문장은 짧게. 한 문장 평균 40자 이내를 유지하고, 긴 문장 뒤에는 반드시 짧은 문장을 놓는다.
+4. 같은 종결어미를 세 문장 넘게 연달아 쓰지 않는다.
+5. 대사가 서사를 끌고 간다. 대사와 지문의 비율은 대략 3:7에서 5:5 사이.
+6. 인물마다 말투를 고정한다. 설정집의 speechStyle 을 어기지 않는다.
+
+## 금지
+- "묘한", "이질적인", "알 수 없는 감정", "복잡한 심경" 같은 뭉뚱그린 감정 서술
+- 같은 정보를 두 번 설명하는 것
+- 회차 안에서 시점 인물이 바뀌는 것
+- "제N화", "다음 화에 계속", "작가의 말" 같은 메타 텍스트를 본문에 넣는 것
+- 요약체로 사건을 훑는 것. 장면으로 쓴다.
+
+## 웹소설 문법
+- 회차는 반드시 다음 화를 보게 만드는 훅으로 끝난다. 상황이 정리된 채 끝내지 않는다.
+- 도입 3문단 안에 갈등이나 이상 신호가 드러나야 한다.
+- 주인공은 매 회차 무언가를 결정하거나 잃거나 얻는다. 관찰만 하지 않는다.`;
+
+P.seriesBlock = (p, c) => `# 시리즈 정보
+- 제목: ${p.title}
+- 로그라인: ${c.logline}
+- 핵심 갈등: ${c.coreConflict}
+- 키워드: ${c.keywords.join(", ")}
+- 흥행 포인트: ${c.sellingPoints.map((s) => `\n  - ${s}`).join("")}
+
+## 시놉시스
+${c.synopsis}
+
+## 주인공
+이름: ${c.protagonist.name} (${c.protagonist.role})
+표면 욕망: ${c.protagonist.want}
+진짜 필요: ${c.protagonist.need}
+결핍: ${c.protagonist.flaw}
+매력 포인트: ${c.protagonist.hook}
+
+## 적대자
+이름: ${c.antagonist.name} (${c.antagonist.role})
+위협: ${c.antagonist.threat}
+동기: ${c.antagonist.motive}`;
+
+P.bibleBlock = (b) => `# 설정집 (절대 어기면 안 되는 사실)
+
+## 세계관
+배경: ${b.world.setting}
+사회: ${b.world.society}
+${b.world.powerSystem ? `체계: ${b.world.powerSystem}\n` : ""}규칙:
+${b.world.rules.map((r) => `- ${r}`).join("\n")}
+작품 시작 이전 사건:
+${b.world.timeline.map((t) => `- ${t}`).join("\n")}
+
+## 등장인물
+${b.characters.map((c) => `### ${c.name}${c.aka ? ` (${c.aka})` : ""} — ${c.role}, ${c.age}
+외모: ${c.appearance}
+성격: ${c.personality}
+말투: ${c.speechStyle}
+배경: ${c.background}
+목표: ${c.goal}${c.secret ? `\n비밀(미공개): ${c.secret}` : ""}${c.relations.length ? `\n관계: ${c.relations.join(" / ")}` : ""}`).join("\n\n")}
+
+## 용어
+${b.glossary.map((g) => `- ${g.term}: ${g.meaning}`).join("\n") || "(없음)"}
+
+## 이 작품의 금기
+${b.taboos.map((t) => `- ${t}`).join("\n") || "(없음)"}`;
+
+P.concept = (p) => `아래 아이디어를 한국 웹소설 연재용 기획으로 구체화하라.
+
+- 가제: ${p.title}
+- 아이디어: ${p.idea}
+- 장르: ${p.genre} / 플랫폼: ${p.platform}
+- 주요 독자: ${p.reader}
+- 예정 분량: ${p.plannedEpisodes}화
+
+## 지켜야 할 것
+1. 로그라인은 "누가 / 무엇을 원하는데 / 무엇이 막고 있고 / 그래서 어떻게 되는가"가 한 문장에 들어가야 한다.
+2. 주인공의 want(표면 욕망)와 need(진짜 필요)를 다르게 설정하라. 같으면 성장 서사가 나오지 않는다.
+3. 흥행 포인트는 "이 작품을 왜 다른 것 대신 읽는가"에 답해야 한다. 장르 관습만 나열하지 마라.
+4. 1화 후킹 전략은 첫 3문단 안에 배치할 사건 하나를 구체적으로 지정하라.
+5. 키워드는 ${p.platform} 독자가 실제로 검색할 법한 말로 쓴다.`;
+
+P.bible = (p, brief) => `아래 기획을 바탕으로 연재 내내 참조할 설정집을 만들어라.
+
+${brief}
+
+## 지켜야 할 것
+1. 세계관 규칙(rules)은 "어겼을 때 이야기가 무너지는 것"만 넣는다. 분위기 묘사는 규칙이 아니다.
+2. 인물은 주인공·적대자를 포함해 5~7명. 각 인물의 speechStyle(말투·어미·자주 쓰는 표현)을 반드시 구체적으로 적어라.
+   예: "존댓말이지만 어미를 짧게 끊는다. '~죠'를 자주 쓴다. 상대를 직함으로 부른다."
+3. 인물의 secret 은 독자에게 아직 밝히지 않은 정보를 적는다. 없으면 빈 문자열.
+4. relations 는 "인물명: 관계" 형식으로 쓴다.
+5. 용어집은 이 작품에서만 쓰는 고유명사·조직·기술 이름만 넣는다.
+6. taboos 는 이 작품에서 하면 안 되는 전개나 표현을 적는다.
+
+총 ${p.plannedEpisodes}화를 버틸 만큼 넉넉하게, 그러나 쓰지 않을 설정은 만들지 마라.`;
+
+P.outline = (count, brief) => `아래 기획과 설정집을 바탕으로 ${count}화 분량의 회차표를 짜라.
+
+${brief}
+
+## 지켜야 할 것
+1. 아크는 3~5개로 나누고, 각 아크의 마지막 회차에 큰 전환점을 배치한다.
+2. 1화의 goal 은 "독자를 붙잡는 것"이다. 세계관 설명이 아니라 사건으로 시작한다.
+3. 매 회차 hook 은 서로 달라야 한다. 같은 종류의 훅을 연속으로 쓰지 마라.
+4. 복선은 심은 뒤 3~10화 안에 회수되도록 plantForeshadow / payoffForeshadow 를 배치하라.
+   복선 식별자는 fs- 로 시작하는 짧은 키로 쓴다. (예: fs-red-envelope)
+5. episodes 배열은 1번부터 ${count}번까지 번호가 빠짐없이 이어져야 한다.
+6. arcId 는 arcs 에 정의한 id 와 정확히 일치해야 한다.`;
+
+P.plan = (n, ctx) => `${n}화의 집필용 트리트먼트를 작성하라.
+
+## 회차표가 정한 이번 화의 역할
+${ctx.outlineEpisode}
+
+## 지금까지의 전개
+${ctx.recent}
+
+## 확정된 사실 (어기면 설정 붕괴)
+${ctx.canon}
+
+## 미회수 복선
+${ctx.foreshadow}
+
+## 지켜야 할 것
+1. beats 는 4~6개. 각 비트는 "어디서 누가 무엇을 해서 무엇이 바뀌는가"를 한 문장으로 쓴다.
+2. 마지막 비트는 반드시 훅으로 끝난다. hook 필드에 그 훅을 한 문장으로 다시 적어라.
+3. charactersOnStage 에는 이번 화에 실제로 등장해 대사나 행동을 하는 인물만 적는다.
+4. mustAvoid 에는 이번 화에서 절대 하면 안 되는 것을 적는다.
+5. 이번 화 본문은 공백 포함 ${ctx.charTarget}자 내외가 된다. 비트를 그 분량에 맞게 잡아라.`;
+
+P.draft = (n, ctx) => `${n}화 본문을 집필하라.
+
+## 이번 화 트리트먼트
+${ctx.plan}
+
+## 직전 회차 마지막 대목 (문체와 장면을 자연스럽게 이어라)
+${ctx.prevTail}
+
+## 지금까지의 전개
+${ctx.recent}
+
+## 확정된 사실 (어기면 설정 붕괴)
+${ctx.canon}
+
+## 미회수 복선
+${ctx.foreshadow}
+
+## 출력 규칙
+- 본문만 출력한다. 제목, 회차 번호, 머리말, 해설, 마크다운 헤딩을 붙이지 않는다.
+- 공백 포함 ${ctx.charMin}자 이상 ${ctx.charMax}자 이하로 쓴다. 목표는 ${ctx.charTarget}자다.
+- 문단은 빈 줄로 구분한다. 한 문단은 1~3문장.
+- 대사는 큰따옴표로 쓰고 한 줄에 하나씩 놓는다.
+- 트리트먼트의 비트를 순서대로 소화하되, 요약하지 말고 장면으로 쓴다.
+- 마지막 문단은 반드시 훅으로 끝낸다: ${ctx.hook}`;
+
+P.revise = (n, ctx) => `아래 ${n}화 원고를 지시대로 퇴고하라.
+
+## 원고
+${ctx.draft}
+
+## 반드시 반영할 수정 지시
+${ctx.notes}
+
+## 자동 검사에서 걸린 문제
+${ctx.metrics}
+
+## 어겨서는 안 되는 확정 사실
+${ctx.canon}
+
+## 출력 규칙
+- 퇴고한 본문 전문만 출력한다. 설명, 변경 요약, 머리말을 붙이지 않는다.
+- 공백 포함 ${ctx.charMin}자 이상 ${ctx.charMax}자 이하를 유지한다.
+- 지시받지 않은 부분은 원문의 표현과 리듬을 그대로 살린다. 전면 재집필이 아니다.
+- 마지막 문단의 훅은 유지하거나 더 강하게 만든다.`;
+
+P.digest = (n, text) => `아래 ${n}화 확정 원고를 읽고, 다음 회차 집필에 넘길 정보를 정리하라.
+
+## 원고
+${text}
+
+## 지켜야 할 것
+1. summary 는 200자 내외. 다음 화를 쓸 작가가 읽고 바로 이어 쓸 수 있어야 한다.
+2. newFacts 에는 "이 회차로 확정되어 앞으로 바꿀 수 없는 사실"만 넣는다.
+   분위기나 감상은 넣지 않는다. 인물의 부상·이동·관계 변화·밝혀진 정보가 대상이다.
+3. characterUpdates 는 이번 화에 상태가 바뀐 인물만 넣는다.
+4. foreshadowPlanted 는 이번 화에서 새로 심은 복선만. id 는 fs- 로 시작하는 짧은 키.
+5. foreshadowResolved 에는 이번 화에서 회수된 복선의 id 만. 없으면 빈 배열.
+6. endingHook 은 이번 화가 실제로 어떻게 끝났는지 한 문장으로.`;
+
+P.judge = (n, ctx) => `아래는 ${n}화 원고다. 연재 담당 편집자로서 냉정하게 심사하라.
+
+## 이번 화가 하기로 했던 것
+${ctx.plan}
+
+## 어겨서는 안 되는 확정 사실
+${ctx.canon}
+
+## 원고
+${ctx.draft}
+
+## 심사 기준
+- immersion 몰입도 / characterConsistency 캐릭터 일관성 / prose 문장력 / hook 훅 강도 / clarity 전달 명료성 (각 1~5)
+
+## 판정 규칙
+- 설정집이나 확정 사실과 모순되는 서술이 하나라도 있으면 continuityViolations 에 적고 verdict 는 revise.
+- 어느 항목이든 2점 이하면 verdict 는 revise.
+- verdict 가 revise 면 revisionNotes 에 "무엇을 어떻게 고칠지"를 실행 가능한 지시로 적어라.
+  "더 재미있게" 같은 말은 금지. "3번째 문단의 회상을 삭제하고 대사로 대체" 처럼 쓴다.
+- verdict 가 pass 면 revisionNotes 는 빈 배열.`;
+
+/* ── 스키마: 값 검증 + 프롬프트용 골격 생성 ──────────────────
+ * "s" 문자열 · "n" 숫자 · ["s"] 문자열 배열 · [{...}] 객체 배열 · {...} 객체 */
+const SCHEMA = {
+  concept: {
+    logline: "s", synopsis: "s", subGenre: "s", keywords: ["s"],
+    protagonist: { name: "s", role: "s", want: "s", need: "s", flaw: "s", hook: "s" },
+    antagonist: { name: "s", role: "s", threat: "s", motive: "s" },
+    coreConflict: "s", sellingPoints: ["s"], firstEpisodeHook: "s", endingDirection: "s",
+  },
+  bible: {
+    world: { setting: "s", rules: ["s"], powerSystem: "s", society: "s", timeline: ["s"] },
+    characters: [{
+      name: "s", aka: "s", role: "s", age: "s", appearance: "s", personality: "s",
+      speechStyle: "s", background: "s", goal: "s", secret: "s", relations: ["s"],
+    }],
+    glossary: [{ term: "s", meaning: "s" }],
+    taboos: ["s"],
+  },
+  outline: {
+    arcs: [{ id: "s", title: "s", summary: "s", fromEpisode: "n", toEpisode: "n", climax: "s" }],
+    episodes: [{
+      number: "n", title: "s", arcId: "s", goal: "s", hook: "s",
+      plantForeshadow: ["s"], payoffForeshadow: ["s"],
+    }],
+  },
+  plan: {
+    number: "n", title: "s", logline: "s", pov: "s", place: "s",
+    charactersOnStage: ["s"], beats: [{ beat: "s", purpose: "s" }],
+    emotionCurve: "s", hook: "s", mustInclude: ["s"], mustAvoid: ["s"],
+  },
+  digest: {
+    summary: "s", keyEvents: ["s"],
+    newFacts: [{ text: "s", category: "s", characters: ["s"] }],
+    characterUpdates: [{ name: "s", state: "s", location: "s", knows: ["s"] }],
+    foreshadowPlanted: [{ id: "s", description: "s", plannedPayoff: "s" }],
+    foreshadowResolved: ["s"], endingHook: "s",
+  },
+  judge: {
+    scores: { immersion: "n", characterConsistency: "n", prose: "n", hook: "n", clarity: "n" },
+    continuityViolations: ["s"],
+    issues: [{ severity: "s", where: "s", problem: "s", fix: "s" }],
+    verdict: "s", revisionNotes: ["s"],
+  },
+};
+
+function validate(value, spec, path = "") {
+  const errs = [];
+  if (typeof spec === "string") {
+    const t = spec === "s" ? "string" : spec === "n" ? "number" : "boolean";
+    if (typeof value !== t) errs.push(`${path || "(root)"}: ${t} 이어야 하는데 ${typeof value}`);
+    return errs;
+  }
+  if (Array.isArray(spec)) {
+    if (!Array.isArray(value)) { errs.push(`${path}: 배열이어야 함`); return errs; }
+    value.forEach((v, i) => errs.push(...validate(v, spec[0], `${path}[${i}]`)));
+    return errs;
+  }
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    errs.push(`${path || "(root)"}: 객체여야 함`); return errs;
+  }
+  for (const [k, s] of Object.entries(spec)) {
+    if (!(k in value)) { errs.push(`${path ? path + "." : ""}${k}: 필드 누락`); continue; }
+    errs.push(...validate(value[k], s, `${path ? path + "." : ""}${k}`));
+  }
+  return errs;
+}
+
+function skeleton(spec) {
+  if (spec === "s") return "문자열";
+  if (spec === "n") return 0;
+  if (spec === "b") return true;
+  if (Array.isArray(spec)) return [skeleton(spec[0])];
+  const out = {};
+  for (const [k, s] of Object.entries(spec)) out[k] = skeleton(s);
+  return out;
+}
+
+function jsonInstruction(spec) {
+  return `\n\n## 출력 형식\n아래 구조에 정확히 맞는 JSON 객체 하나만 출력하라. 설명·인사말·코드펜스 없이 JSON만.\n모든 필드는 필수다. 값이 없으면 빈 문자열이나 빈 배열을 넣되 필드를 빼지 마라.\n한국어로 작성한다.\n\n${JSON.stringify(skeleton(spec), null, 1)}`;
+}
+
+function extractJson(raw) {
+  const fence = /```(?:json)?\s*([\s\S]*?)```/i.exec(raw);
+  const body = (fence ? fence[1] : raw).trim();
+  const start = body.search(/[[{]/);
+  if (start < 0) return null;
+  const open = body[start], close = open === "{" ? "}" : "]";
+  let depth = 0, inStr = false, esc = false;
+  for (let i = start; i < body.length; i++) {
+    const ch = body[i];
+    if (inStr) { if (esc) esc = false; else if (ch === "\\") esc = true; else if (ch === '"') inStr = false; continue; }
+    if (ch === '"') inStr = true;
+    else if (ch === open) depth++;
+    else if (ch === close && --depth === 0) return body.slice(start, i + 1);
+  }
+  return null;
+}
+
+/* ── API 호출 ────────────────────────────────────────────────── */
+const PRICE = { "claude-opus-5": [5, 25], "claude-opus-4-8": [5, 25], "claude-sonnet-5": [3, 15], "claude-haiku-4-5": [1, 5] };
+
+let abortController = null;
+
+async function* sseFrames(res) {
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let i;
+    while ((i = buf.indexOf("\n\n")) >= 0) {
+      const frame = buf.slice(0, i); buf = buf.slice(i + 2);
+      for (const line of frame.split("\n")) {
+        if (line.startsWith("data:")) yield line.slice(5).trim();
+      }
+    }
+  }
+}
+
+function friendlyError(err, provider) {
+  const msg = String(err && err.message ? err.message : err);
+  if (/Failed to fetch|NetworkError|Load failed/i.test(msg)) {
+    return `${provider} 에 연결하지 못했습니다.\n` +
+      "원인은 보통 셋 중 하나입니다:\n" +
+      "1) API 키가 틀렸거나 비어 있음\n" +
+      "2) 이 제공자가 브라우저 직접 호출(CORS)을 막음 — 설정에서 Anthropic 으로 바꿔보세요\n" +
+      "3) 인터넷 연결 문제";
+  }
+  return msg;
+}
+
+/** 한 번 호출한다. stream 이면 onDelta 로 조각을 흘려보낸다. */
+async function callModel({ system, user, maxTokens = 16000, onDelta = null }) {
+  const cfg = loadSettings();
+  if (!cfg.key && cfg.provider !== "openai") throw new Error("설정에서 API 키를 먼저 넣으세요.");
+  abortController = new AbortController();
+  const signal = abortController.signal;
+  const blocks = system.filter((s) => s && s.trim());
+  let url, headers, body, pickDelta, pickUsage;
+
+  if (cfg.provider === "anthropic") {
+    url = "https://api.anthropic.com/v1/messages";
+    headers = {
+      "content-type": "application/json",
+      "x-api-key": cfg.key,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true",
+    };
+    body = {
+      model: cfg.model, max_tokens: maxTokens, stream: true,
+      system: blocks.map((text, i) => ({
+        type: "text", text,
+        ...(i === blocks.length - 1 ? { cache_control: { type: "ephemeral" } } : {}),
+      })),
+      messages: [{ role: "user", content: user }],
+      thinking: { type: "adaptive" },
+      output_config: { effort: "high" },
+    };
+    pickDelta = (d) => (d.type === "content_block_delta" && d.delta && d.delta.type === "text_delta" ? d.delta.text : "");
+    pickUsage = (d) =>
+      d.type === "message_start" ? { in: d.message.usage.input_tokens, cacheRead: d.message.usage.cache_read_input_tokens || 0 }
+      : d.type === "message_delta" && d.usage ? { out: d.usage.output_tokens } : null;
+  } else if (cfg.provider === "gemini") {
+    url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(cfg.model)}:streamGenerateContent?alt=sse`;
+    headers = { "content-type": "application/json", "x-goog-api-key": cfg.key };
+    body = {
+      systemInstruction: { parts: [{ text: blocks.join("\n\n") }] },
+      contents: [{ role: "user", parts: [{ text: user }] }],
+      generationConfig: { maxOutputTokens: maxTokens },
+    };
+    pickDelta = (d) => {
+      const parts = d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts;
+      return parts ? parts.map((p) => p.text || "").join("") : "";
+    };
+    pickUsage = (d) => (d.usageMetadata ? { in: d.usageMetadata.promptTokenCount || 0, out: d.usageMetadata.candidatesTokenCount || 0 } : null);
+  } else {
+    const base = (cfg.baseUrl || "https://openrouter.ai/api/v1").replace(/\/+$/, "");
+    url = `${base}/chat/completions`;
+    headers = { "content-type": "application/json" };
+    if (cfg.key) headers["authorization"] = `Bearer ${cfg.key}`;
+    body = {
+      model: cfg.model, max_tokens: maxTokens, stream: true,
+      messages: [
+        ...(blocks.length ? [{ role: "system", content: blocks.join("\n\n") }] : []),
+        { role: "user", content: user },
+      ],
+    };
+    pickDelta = (d) => {
+      const c = d.choices && d.choices[0];
+      return c && c.delta && c.delta.content ? c.delta.content : "";
+    };
+    pickUsage = (d) => (d.usage ? { in: d.usage.prompt_tokens || 0, out: d.usage.completion_tokens || 0 } : null);
+  }
+
+  let res;
+  try {
+    res = await fetch(url, { method: "POST", headers, body: JSON.stringify(body), signal });
+  } catch (err) {
+    if (err.name === "AbortError") throw err;
+    throw new Error(friendlyError(err, PROVIDERS[cfg.provider].label));
+  }
+  if (!res.ok) {
+    const text = await res.text();
+    if (res.status === 401 || res.status === 403) throw new Error(`인증 실패(${res.status}). API 키를 확인하세요.\n${text.slice(0, 300)}`);
+    if (res.status === 404) throw new Error(`모델을 찾을 수 없습니다(404). 설정의 모델명을 확인하세요: ${cfg.model}\n${text.slice(0, 300)}`);
+    if (res.status === 429) throw new Error(`요청 한도 초과(429). 잠시 후 다시 시도하세요.\n${text.slice(0, 300)}`);
+    throw new Error(`HTTP ${res.status}\n${text.slice(0, 500)}`);
+  }
+
+  let out = "";
+  const usage = { in: 0, out: 0, cacheRead: 0 };
+  for await (const data of sseFrames(res)) {
+    if (data === "[DONE]") break;
+    let parsed;
+    try { parsed = JSON.parse(data); } catch { continue; }
+    if (parsed.type === "error") throw new Error(parsed.error ? parsed.error.message : "스트림 오류");
+    const piece = pickDelta(parsed) || "";
+    if (piece) { out += piece; if (onDelta) onDelta(piece, out); }
+    const u = pickUsage(parsed);
+    if (u) { usage.in += u.in || 0; usage.out += u.out || 0; usage.cacheRead += u.cacheRead || 0; }
+  }
+  abortController = null;
+  recordUsage(usage);
+  return out.trim();
+}
+
+/** 구조화 JSON 을 받아온다. 검증 실패 시 오류를 돌려주며 한 번 더 요청한다. */
+async function callJson(spec, { system, user }) {
+  const ask = user + jsonInstruction(spec);
+  const first = await callModel({ system, user: ask });
+  const parse = (raw) => {
+    const block = extractJson(raw);
+    if (!block) return { ok: false, error: "응답에서 JSON 을 찾지 못했습니다." };
+    let v;
+    try { v = JSON.parse(block); } catch (e) { return { ok: false, error: `JSON 문법 오류: ${e.message}` }; }
+    const errs = validate(v, spec);
+    return errs.length ? { ok: false, error: errs.slice(0, 8).join("\n") } : { ok: true, value: v };
+  };
+  let r = parse(first);
+  if (r.ok) return r.value;
+  log("warn", `형식 검증 실패 — 교정 요청: ${r.error.split("\n")[0]}`);
+  const second = await callModel({
+    system,
+    user: `${ask}\n\n── 직전 응답이 형식 검증에 실패했다. 아래 오류를 고쳐 JSON만 다시 출력하라. ──\n[직전 응답]\n${first.slice(0, 4000)}\n\n[검증 오류]\n${r.error}`,
+  });
+  r = parse(second);
+  if (r.ok) return r.value;
+  throw new Error(`형식 검증에 두 번 실패했습니다.\n${r.error}`);
+}
+
+/* ── 규칙 기반 검수 (LLM 없이 즉시·무료) ────────────────────── */
+const BANNED = ["묘한 이질감", "알 수 없는 감정", "복잡한 심경", "말로 표현할 수 없는", "형언할 수 없는", "그것은 시작에 불과했다"];
+const META = [[/제\s*\d+\s*화/, "회차 번호 표기"], [/다음\s*화에\s*계속/, "연재 안내"], [/작가의\s*말/, "작가의 말"], [/^\s*#{1,6}\s+\S/m, "마크다운 헤딩"]];
+const COMMON = new Set("그것 이것 사람 시간 생각 이야기 목소리 마음 얼굴 자신 여자 남자 아이 순간 상황 문제 눈빛 어깨 머리 가슴 표정 공기 소리 바람 하늘 세상 세계 회사 사무실 자리 자기 우리 당신 지금 오늘 내일 어제 이번 다음 처음 마지막 전부 모두 아무 누구 무엇 이유 결과 방법 정도 사실 대답 질문 눈물 웃음 사이 한참 이름 증거 여유 기억 약속 선택 기회 위치 장소 방향 그녀 그들 이제 아직 결국 물론 정말 역시 분위기 시선 침묵 고개".split(" "));
+
+const paragraphsOf = (t) => t.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+const sentencesOf = (t) => paragraphsOf(t).flatMap((p) => p.split(/(?<=[.!?…])\s+/)).map((s) => s.trim()).filter(Boolean);
+
+function analyze(text, target, tolerance = 0.12) {
+  const paras = paragraphsOf(text), sents = sentencesOf(text);
+  const chars = [...text].length;
+  const min = Math.round(target * (1 - tolerance)), max = Math.round(target * (1 + tolerance));
+  const noSpace = text.replace(/\s/g, "").length;
+  const quoted = text.match(/"[^"]{1,400}"|'[^']{1,400}'|「[^」]{1,400}」/g) || [];
+  const ratio = noSpace ? quoted.reduce((s, m) => s + m.replace(/\s/g, "").length, 0) / noSpace : 0;
+  const avg = sents.length ? sents.reduce((s, x) => s + x.length, 0) / sents.length : 0;
+  const longP = paras.filter((p) => p.length > 120).length;
+  const longRatio = paras.length ? longP / paras.length : 0;
+
+  const ends = sents.map((s) => s.replace(/["'」\s]+$/, "").replace(/[.!?…]+$/, "").slice(-2));
+  let run = 0, best = 0, prev = "";
+  for (const e of ends) { run = e && e === prev ? run + 1 : 1; prev = e; if (run > best) best = run; }
+
+  const toks = text.replace(/["'「」]/g, " ").split(/\s+/).map((t) => t.replace(/[.,!?…]+$/, "")).filter(Boolean);
+  const grams = new Map();
+  for (let i = 0; i + 4 <= toks.length; i++) { const g = toks.slice(i, i + 4).join(" "); grams.set(g, (grams.get(g) || 0) + 1); }
+  const repeats = [...grams.entries()].filter(([, c]) => c > 2).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+  const banned = BANNED.filter((b) => text.includes(b));
+  const meta = META.filter(([re]) => re.test(text)).map(([, w]) => w);
+
+  const known = new Set(currentProject() && currentProject().bible
+    ? currentProject().bible.characters.flatMap((c) => [c.name, c.aka]).concat(currentProject().bible.glossary.map((g) => g.term)) : []);
+  const counts = new Map(), animate = new Set();
+  for (const m of text.matchAll(/(?<![가-힣])([가-힣]{2,4})(은|는|이|가|을|를|의|와|과|에게|에서|께서)(?![가-힣])/g)) {
+    const w = m[1];
+    if (COMMON.has(w) || known.has(w)) continue;
+    counts.set(w, (counts.get(w) || 0) + 1);
+    if ("은는이가께서에게".includes(m[2])) animate.add(w);
+  }
+  const unknown = [...counts.entries()].filter(([w, c]) => c >= 3 && animate.has(w)).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([w, c]) => `${w}(${c}회)`);
+
+  const M = (id, label, level, ok, value, detail = "") => ({ id, label, level, ok, value, detail });
+  const metrics = [
+    M("chars", "분량(공백 포함)", "error", chars >= min && chars <= max, `${num(chars)}자`, `허용 ${num(min)}~${num(max)}자`),
+    M("banned", "금칙 표현", "error", !banned.length, banned.length ? `${banned.length}건` : "없음", banned.join(" / ")),
+    M("meta", "본문 오염", "error", !meta.length, meta.length ? `${meta.length}건` : "없음", meta.join(" / ")),
+    M("dialogue", "대사 비율", "warn", ratio >= 0.2 && ratio <= 0.6, `${(ratio * 100).toFixed(1)}%`, "권장 20~60%"),
+    M("avg", "평균 문장 길이", "warn", avg <= 45, `${avg.toFixed(1)}자`, "권장 45자 이하"),
+    M("longp", "긴 문단 비율", "warn", longRatio <= 0.15, `${(longRatio * 100).toFixed(1)}%`, `120자 초과 ${longP}/${paras.length}개`),
+    M("repeat", "반복 표현", "warn", !repeats.length, repeats.length ? `${repeats.length}종` : "없음", repeats.map(([g, c]) => `"${g}" ${c}회`).join(" / ")),
+    M("ending", "종결어미 연속", "warn", best <= 3, `${best}연속`, ""),
+    M("noun", "설정집에 없는 고유명사 후보", "warn", !unknown.length, unknown.length ? `${unknown.length}종` : "없음", unknown.join(", ")),
+  ];
+  return { chars, metrics, errors: metrics.filter((m) => m.level === "error" && !m.ok), warnings: metrics.filter((m) => m.level === "warn" && !m.ok) };
+}
+
+/* ── 저장소 ──────────────────────────────────────────────────── */
+const SKEY = "websocial.settings", PKEY = "websocial.projects";
+const loadSettings = () => Object.assign({ provider: "anthropic", key: "", model: "claude-opus-5", baseUrl: "" }, JSON.parse(localStorage.getItem(SKEY) || "{}"));
+const saveSettings = (s) => localStorage.setItem(SKEY, JSON.stringify(s));
+const loadProjects = () => JSON.parse(localStorage.getItem(PKEY) || "{}");
+function saveProjects(p) {
+  try { localStorage.setItem(PKEY, JSON.stringify(p)); }
+  catch { alert("브라우저 저장 공간이 가득 찼습니다. 오래된 작품을 지우거나 백업(JSON 내려받기) 후 정리하세요."); }
+}
+const currentProject = () => loadProjects()[state.id] || null;
+function updateProject(fn) {
+  const all = loadProjects();
+  const p = all[state.id];
+  if (!p) return null;
+  fn(p);
+  all[state.id] = p;
+  saveProjects(all);
+  return p;
+}
+function recordUsage(u) {
+  updateProject((p) => {
+    p.usage = p.usage || { calls: 0, in: 0, out: 0, cacheRead: 0, costUsd: 0 };
+    const cfg = loadSettings();
+    const price = PRICE[cfg.model];
+    p.usage.calls++; p.usage.in += u.in; p.usage.out += u.out; p.usage.cacheRead += u.cacheRead;
+    if (price) p.usage.costUsd += (u.in * price[0] + u.out * price[1] + u.cacheRead * price[0] * 0.1) / 1e6;
+  });
+}
+
+/* ── 진행 로그 ───────────────────────────────────────────────── */
+const state = { id: "", tab: "work", episode: null, running: false, stream: "" };
+function log(level, msg) {
+  const box = $("logBox");
+  if (!box) return;
+  box.append(el("div", { className: level, textContent: msg }));
+  box.scrollTop = box.scrollHeight;
+}
+const setBadge = (t, cls = "") => { $("statusBadge").textContent = t; $("statusBadge").className = "tag " + cls; };
+
+/* ── 파이프라인 ──────────────────────────────────────────────── */
+const bounds = (p) => ({ target: p.charTarget, min: Math.round(p.charTarget * 0.88), max: Math.round(p.charTarget * 1.12) });
+const brief = (p) => `제목: ${p.title}\n장르: ${p.genre} / 플랫폼: ${p.platform}\n로그라인: ${p.concept.logline}\n핵심 갈등: ${p.concept.coreConflict}\n주인공: ${p.concept.protagonist.name} — 원하는 것 ${p.concept.protagonist.want} / 진짜 필요한 것 ${p.concept.protagonist.need}\n적대자: ${p.concept.antagonist.name} — ${p.concept.antagonist.threat}\n키워드: ${p.concept.keywords.join(", ")}\n\n시놉시스:\n${p.concept.synopsis}`;
+const baseBlocks = (p) => [P.style(p), P.seriesBlock(p, p.concept), P.bibleBlock(p.bible)];
+const fmtCanon = (p, names = []) => {
+  const set = new Set(names);
+  const rel = p.canon.filter((f) => !f.characters.length || f.characters.some((c) => set.has(c)));
+  const merged = [...new Map([...rel, ...p.canon.slice(-12)].map((f) => [f.id, f])).values()].slice(-40);
+  return merged.length ? merged.map((f) => `- [${f.episode}화·${f.category}] ${f.text}`).join("\n") : "(아직 확정된 사실 없음)";
+};
+const fmtForeshadow = (p) => {
+  const open = p.foreshadow.filter((f) => !f.resolvedAt);
+  return open.length ? open.map((f) => `- ${f.id} (${f.plantedAt}화에 심음): ${f.description} → 회수 계획: ${f.plannedPayoff}`).join("\n") : "(미회수 복선 없음)";
+};
+const fmtRecent = (p, n) => {
+  const lines = [];
+  for (let i = Math.max(1, n - 3); i < n; i++) { const e = p.episodes[i]; if (e && e.digest) lines.push(`- ${i}화: ${e.digest.summary}`); }
+  return lines.length ? lines.join("\n") : "(첫 회차)";
+};
+const fmtPlan = (pl) => `제목: ${pl.title}\n로그라인: ${pl.logline}\n시점: ${pl.pov} / 장소: ${pl.place}\n등장인물: ${pl.charactersOnStage.join(", ")}\n감정선: ${pl.emotionCurve}\n비트:\n${pl.beats.map((b, i) => `  ${i + 1}. ${b.beat} (목적: ${b.purpose})`).join("\n")}\n훅: ${pl.hook}\n반드시 포함: ${pl.mustInclude.join(" / ") || "(없음)"}\n절대 금지: ${pl.mustAvoid.join(" / ") || "(없음)"}`;
+const prevTail = (p, n) => {
+  const prev = p.episodes[n - 1];
+  if (!prev || !prev.final) return "(첫 회차라 이어받을 대목 없음)";
+  return prev.final.length <= 400 ? prev.final : "..." + prev.final.slice(-400);
+};
+
+async function stepConcept(p) {
+  log("step", "기획 생성 중…");
+  const c = await callJson(SCHEMA.concept, { system: [P.style(p)], user: P.concept(p) });
+  updateProject((x) => { x.concept = c; });
+  log("ok", `기획 완료 — ${c.logline}`);
+}
+async function stepBible(p) {
+  log("step", "설정집 생성 중…");
+  const b = await callJson(SCHEMA.bible, { system: [P.style(p)], user: P.bible(p, brief(p)) });
+  updateProject((x) => { x.bible = b; });
+  log("ok", `설정집 완료 — 인물 ${b.characters.length}명, 규칙 ${b.world.rules.length}개`);
+}
+async function stepOutline(p, count) {
+  log("step", `회차표 생성 중… (${count}화)`);
+  const o = await callJson(SCHEMA.outline, { system: [P.style(p), P.bibleBlock(p.bible)], user: P.outline(count, brief(p)) });
+  const missing = Array.from({ length: count }, (_, i) => i + 1).filter((n) => !o.episodes.some((e) => e.number === n));
+  if (missing.length) throw new Error(`회차표에 빠진 회차: ${missing.slice(0, 8).join(", ")}. 다시 시도하세요.`);
+  updateProject((x) => { x.outline = o; });
+  log("ok", `회차표 완료 — 아크 ${o.arcs.length}개 / ${o.episodes.length}화`);
+}
+
+function applyDigest(p, n, d) {
+  updateProject((x) => {
+    const known = new Set(x.canon.map((f) => f.text.trim()));
+    for (const f of d.newFacts) {
+      const t = f.text.trim();
+      if (!t || known.has(t)) continue;
+      known.add(t);
+      x.canon.push({ id: `f-${n}-${x.canon.length + 1}`, text: t, category: f.category, characters: f.characters, episode: n });
+    }
+    for (const f of d.foreshadowPlanted) {
+      const id = (f.id || "").trim();
+      if (!id || x.foreshadow.some((i) => i.id === id)) continue;
+      x.foreshadow.push({ id, description: f.description, plannedPayoff: f.plannedPayoff, plantedAt: n, resolvedAt: 0 });
+    }
+    for (const id of d.foreshadowResolved) {
+      const it = x.foreshadow.find((i) => i.id === (id || "").trim());
+      if (it && !it.resolvedAt) it.resolvedAt = n;
+    }
+    for (const u of d.characterUpdates) {
+      const name = (u.name || "").trim();
+      if (!name) continue;
+      const s = x.states.find((v) => v.name === name);
+      if (s) { s.state = u.state; s.location = u.location; s.knows = [...new Set([...s.knows, ...u.knows])].slice(-20); s.updatedAt = n; }
+      else x.states.push({ name, state: u.state, location: u.location, knows: [...new Set(u.knows)], updatedAt: n });
+    }
+  });
+}
+
+async function writeEpisode(n) {
+  let p = currentProject();
+  const oe = p.outline.episodes.find((e) => e.number === n);
+  if (!oe) throw new Error(`회차표에 ${n}화가 없습니다.`);
+  const b = bounds(p);
+  const ep = p.episodes[n] || {};
+
+  if (!ep.plan) {
+    log("step", `${n}화 트리트먼트…`);
+    const plan = await callJson(SCHEMA.plan, {
+      system: baseBlocks(p),
+      user: P.plan(n, {
+        outlineEpisode: `제목: ${oe.title}\n목표: ${oe.goal}\n훅: ${oe.hook}\n심을 복선: ${oe.plantForeshadow.join(", ") || "(없음)"}\n회수할 복선: ${oe.payoffForeshadow.join(", ") || "(없음)"}`,
+        recent: fmtRecent(p, n), canon: fmtCanon(p), foreshadow: fmtForeshadow(p), charTarget: b.target,
+      }),
+    });
+    plan.number = n;
+    updateProject((x) => { x.episodes[n] = Object.assign(x.episodes[n] || {}, { plan, status: "planned" }); });
+    log("ok", `트리트먼트 — ${plan.title}`);
+  }
+
+  p = currentProject();
+  let text = p.episodes[n].draft || "";
+  if (!text) {
+    log("step", `${n}화 집필 중… (1~3분 걸릴 수 있습니다)`);
+    state.stream = "";
+    text = await callModel({
+      system: baseBlocks(p),
+      user: P.draft(n, {
+        plan: fmtPlan(p.episodes[n].plan), prevTail: prevTail(p, n), recent: fmtRecent(p, n),
+        canon: fmtCanon(p, p.episodes[n].plan.charactersOnStage), foreshadow: fmtForeshadow(p),
+        charTarget: b.target, charMin: b.min, charMax: b.max, hook: p.episodes[n].plan.hook,
+      }),
+      onDelta: (_, all) => { state.stream = all; const s = $("streamBox"); if (s) { s.textContent = all.slice(-1500); s.scrollTop = s.scrollHeight; } },
+    });
+    updateProject((x) => { x.episodes[n].draft = text; x.episodes[n].status = "drafted"; });
+    log("ok", `초고 ${num(text.length)}자`);
+  }
+
+  for (let round = 0; round <= 2; round++) {
+    p = currentProject();
+    const rep = analyze(text, b.target);
+    let judge = null;
+    if (p.useJudge !== false) {
+      log("step", `${n}화 검수 중…`);
+      try {
+        judge = await callJson(SCHEMA.judge, {
+          system: baseBlocks(p),
+          user: P.judge(n, { plan: fmtPlan(p.episodes[n].plan), canon: fmtCanon(p, p.episodes[n].plan.charactersOnStage), draft: text }),
+        });
+      } catch (e) { log("warn", `AI 심사 건너뜀: ${e.message.split("\n")[0]}`); }
+    }
+    const reasons = [
+      ...rep.errors.map((m) => `[검사 실패] ${m.label}: ${m.value} ${m.detail}`),
+      ...(rep.warnings.length >= 4 ? [`[경고 누적] ${rep.warnings.length}건`] : []),
+      ...(judge ? judge.continuityViolations.map((v) => `[설정 모순] ${v}`) : []),
+      ...(judge && judge.verdict === "revise" ? ["[AI 심사] 퇴고 필요"] : []),
+    ];
+    const notes = [
+      ...rep.warnings.map((m) => `${m.label}: ${m.value} ${m.detail} — 개선할 것`),
+      ...(judge ? judge.revisionNotes : []),
+      ...(judge ? judge.issues.map((i) => `${i.where} → ${i.fix}`) : []),
+    ].filter(Boolean);
+    const qa = { verdict: reasons.length ? "revise" : "pass", reasons, revisionNotes: [...new Set(notes)], metrics: rep.metrics, judge, chars: rep.chars };
+    updateProject((x) => { x.episodes[n].qa = qa; });
+    for (const m of rep.metrics) log(m.ok ? "ok" : m.level, `${m.ok ? "OK  " : m.level === "error" ? "실패" : "경고"} ${m.label}: ${m.value} ${m.detail}`);
+
+    if (qa.verdict === "pass") {
+      updateProject((x) => { x.episodes[n].final = text; x.episodes[n].status = "final"; x.episodes[n].revisions = round; });
+      log("ok", `${n}화 확정 (${num(text.length)}자, 퇴고 ${round}회)`);
+      log("step", `${n}화 다이제스트…`);
+      const d = await callJson(SCHEMA.digest, { system: baseBlocks(p), user: P.digest(n, text) });
+      updateProject((x) => { x.episodes[n].digest = d; });
+      applyDigest(p, n, d);
+      log("ok", `캐논 갱신 — 새 사실 ${d.newFacts.length}건, 복선 +${d.foreshadowPlanted.length}/-${d.foreshadowResolved.length}`);
+      return "final";
+    }
+    if (round === 2) break;
+    log("warn", `검수 실패 → 퇴고 ${round + 1}차: ${reasons.slice(0, 2).join(" / ")}`);
+    state.stream = "";
+    text = await callModel({
+      system: baseBlocks(p),
+      user: P.revise(n, {
+        draft: text, notes: qa.revisionNotes.map((x) => `- ${x}`).join("\n") || "(자동 검사 지적만 반영)",
+        metrics: rep.metrics.filter((m) => !m.ok).map((m) => `- ${m.label}: ${m.value} ${m.detail}`).join("\n") || "(없음)",
+        canon: fmtCanon(p), charMin: b.min, charMax: b.max,
+      }),
+      onDelta: (_, all) => { const s = $("streamBox"); if (s) { s.textContent = all.slice(-1500); s.scrollTop = s.scrollHeight; } },
+    });
+    updateProject((x) => { x.episodes[n].draft = text; x.episodes[n].status = "revised"; x.episodes[n].revisions = round + 1; });
+  }
+
+  updateProject((x) => { x.episodes[n].status = "needs_human"; });
+  log("error", `${n}화는 자동 퇴고 2회 후에도 기준을 넘지 못했습니다. 회차 탭에서 직접 고쳐 저장하세요.`);
+  return "needs_human";
+}
+
+async function runTo(target) {
+  if (state.running) return;
+  state.running = true; setBadge("실행 중…", "warn"); render();
+  try {
+    let p = currentProject();
+    if (!p.concept) { await stepConcept(p); p = currentProject(); }
+    if (!p.bible) { await stepBible(p); p = currentProject(); }
+    if (!p.outline) { await stepOutline(p, p.plannedEpisodes); p = currentProject(); }
+    const last = Math.min(target, p.outline.episodes.length);
+    for (let n = 1; n <= last; n++) {
+      p = currentProject();
+      if (p.episodes[n] && p.episodes[n].status === "final") continue;
+      const r = await writeEpisode(n);
+      if (r === "needs_human") break;
+    }
+    log("ok", "진행 완료");
+  } catch (err) {
+    if (err.name === "AbortError") log("warn", "사용자가 중단했습니다.");
+    else log("error", err.message);
+  } finally {
+    state.running = false; setBadge(""); render();
+  }
+}
+
+/* ── 화면 ────────────────────────────────────────────────────── */
+const STATUS = { pending: ["대기", ""], planned: ["트리트먼트", ""], drafted: ["초고", ""], revised: ["퇴고", ""], final: ["확정", "ok"], needs_human: ["사람 확인", "err"] };
+
+function download(name, text) {
+  const url = URL.createObjectURL(new Blob([text], { type: "text/plain;charset=utf-8" }));
+  const a = el("a", { href: url, download: name });
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function tabsBar() {
+  return el("nav", {}, [["work", "작품"], ["episodes", "회차"], ["bible", "설정집"], ["canon", "연속성"]].map(([id, label]) =>
+    el("button", { className: state.tab === id ? "on" : "", textContent: label, onclick: () => { state.tab = id; state.episode = null; render(); } })));
+}
+
+function workTab(p) {
+  const eps = p.outline ? p.outline.episodes : [];
+  const done = eps.filter((e) => p.episodes[e.number] && p.episodes[e.number].status === "final").length;
+  const total = eps.length || p.plannedEpisodes;
+  const u = p.usage || { calls: 0, costUsd: 0 };
+  const open = p.foreshadow.filter((f) => !f.resolvedAt).length;
+
+  return [
+    el("div", { className: "card" },
+      el("h2", { textContent: p.title }),
+      el("p", { className: "muted", style: "margin-top:-6px", textContent: p.idea }),
+      el("div", { className: "grid" },
+        el("div", {}, el("div", { className: "stat", textContent: `${done} / ${total}` }), el("div", { className: "muted", textContent: "확정 회차" })),
+        el("div", {}, el("div", { className: "stat", textContent: `$${u.costUsd.toFixed(3)}` }), el("div", { className: "muted", textContent: `누적 비용 · 호출 ${u.calls}회` })),
+        el("div", {}, el("div", { className: "stat", textContent: num(p.canon.length) }), el("div", { className: "muted", textContent: "확정 사실" })),
+        el("div", {}, el("div", { className: "stat", textContent: num(open) }), el("div", { className: "muted", textContent: "미회수 복선" }))),
+      el("div", { className: "bar", style: "margin-top:13px" }, el("i", { style: `width:${total ? (done / total) * 100 : 0}%` }))),
+
+    el("div", { className: "card" },
+      el("h2", { textContent: "1단계 · 준비" }),
+      el("div", { className: "grid" },
+        [["concept", "기획", () => stepConcept(currentProject())],
+         ["bible", "설정집", () => stepBible(currentProject())],
+         ["outline", "회차표", () => stepOutline(currentProject(), currentProject().plannedEpisodes)]].map(([k, label, fn]) =>
+          el("div", {},
+            el("div", { className: "row" }, el("strong", { textContent: label }),
+              el("span", { className: "tag " + (p[k] ? "ok" : ""), textContent: p[k] ? "완료" : "미완" })),
+            el("button", {
+              className: "ghost tiny", style: "margin-top:6px", disabled: state.running,
+              textContent: p[k] ? "다시 만들기" : "만들기",
+              onclick: async () => {
+                if (p[k] && !confirm(`${label}을 다시 만들면 기존 내용을 덮어씁니다. 계속할까요?`)) return;
+                if (k !== "concept" && !p.concept) return alert("기획을 먼저 만드세요.");
+                if (k === "outline" && !p.bible) return alert("설정집을 먼저 만드세요.");
+                state.running = true; setBadge("실행 중…", "warn"); render();
+                try { await fn(); } catch (e) { log("error", e.message); }
+                finally { state.running = false; setBadge(""); render(); }
+              },
+            })))),
+      el("p", { className: "muted", style: "font-size:12px", textContent: "아래 ‘연재 진행’ 을 누르면 준비 단계가 안 되어 있어도 알아서 먼저 만듭니다." })),
+
+    el("div", { className: "card" },
+      el("h2", { textContent: "2단계 · 연재 진행" }),
+      el("div", { className: "row" },
+        el("div", {}, el("label", { textContent: "몇 화까지" }),
+          el("input", { type: "number", id: "runTo", value: String(Math.min(done + 2, total) || 2), min: "1", style: "width:110px" })),
+        el("div", {}, el("label", { textContent: "AI 심사" }),
+          el("label", { className: "row", style: "color:var(--text)" },
+            el("input", { type: "checkbox", id: "useJudge", checked: p.useJudge !== false,
+              onchange: (e) => updateProject((x) => { x.useJudge = e.target.checked; }) }), "켜기(권장)")),
+        el("div", { style: "align-self:flex-end" },
+          el("button", { disabled: state.running, textContent: state.running ? "진행 중…" : "연재 진행",
+            onclick: () => runTo(Number($("runTo").value)) }),
+          state.running ? el("button", { className: "ghost", style: "margin-left:8px", textContent: "중단",
+            onclick: () => { if (abortController) abortController.abort(); } }) : null)),
+      el("h3", { textContent: "생성 중인 원고" }),
+      el("div", { className: "stream", id: "streamBox", textContent: state.stream || "집필이 시작되면 여기에 실시간으로 나옵니다." }),
+      el("h3", { textContent: "진행 로그" }),
+      el("div", { className: "log", id: "logBox" })),
+
+    el("div", { className: "card" },
+      el("h2", { textContent: "내보내기 / 백업" }),
+      el("div", { className: "row" },
+        el("button", { className: "ghost", textContent: "전체 원고 (txt)", onclick: () => {
+          const eps2 = (p.outline ? p.outline.episodes : []).filter((e) => p.episodes[e.number] && p.episodes[e.number].final);
+          if (!eps2.length) return alert("확정된 원고가 없습니다.");
+          download(`${p.title}.txt`, `${p.title}\n\n` + eps2.map((e) => `${e.number}화 ${e.title}\n\n${p.episodes[e.number].final}`).join("\n\n\n"));
+        } }),
+        el("button", { className: "ghost", textContent: "작품 백업 (json)", onclick: () => download(`${p.title}.json`, JSON.stringify(p, null, 2)) }),
+        el("button", { className: "ghost", textContent: "이 작품 삭제", onclick: () => {
+          if (!confirm(`"${p.title}" 을 삭제합니다. 되돌릴 수 없습니다.`)) return;
+          const all = loadProjects(); delete all[state.id]; saveProjects(all);
+          state.id = Object.keys(all)[0] || ""; render(); refreshPicker();
+        } })),
+      el("p", { className: "muted", style: "font-size:12px", textContent: "데이터는 이 브라우저에만 저장됩니다. 브라우저 데이터를 지우면 사라지니 가끔 백업하세요." })),
+  ];
+}
+
+function episodesTab(p) {
+  if (state.episode) return episodeView(p);
+  if (!p.outline) return el("div", { className: "card muted", textContent: "회차표를 먼저 만드세요 (작품 탭)." });
+  return el("div", { className: "card overflow" },
+    el("h2", { textContent: "회차" }),
+    el("table", {},
+      el("thead", {}, el("tr", {}, ["번호", "제목", "상태", "글자수", "퇴고"].map((h) => el("th", { textContent: h })))),
+      el("tbody", {}, p.outline.episodes.map((e) => {
+        const st = p.episodes[e.number] || {};
+        const [label, cls] = STATUS[st.status || "pending"];
+        return el("tr", { className: "click", onclick: () => { state.episode = e.number; render(); } },
+          el("td", { textContent: `${e.number}화` }), el("td", { textContent: e.title }),
+          el("td", {}, el("span", { className: `tag ${cls}`, textContent: label })),
+          el("td", { textContent: st.final || st.draft ? num((st.final || st.draft).length) : "-" }),
+          el("td", { textContent: st.revisions ? `${st.revisions}회` : "-" }));
+      }))));
+}
+
+function episodeView(p) {
+  const n = state.episode, ep = p.episodes[n] || {};
+  const meta = p.outline.episodes.find((e) => e.number === n);
+  const text = ep.final || ep.draft || "";
+  const editor = el("textarea", { value: text, rows: 24 });
+
+  const left = el("div", {},
+    el("div", { className: "card" },
+      el("div", { className: "row" },
+        el("button", { className: "ghost tiny", textContent: "← 목록", onclick: () => { state.episode = null; render(); } }),
+        el("strong", { textContent: `${n}화 ${meta ? meta.title : ""}` })),
+      ep.plan ? el("div", {},
+        el("h3", { textContent: "트리트먼트" }),
+        el("p", { className: "muted", style: "font-size:13px", textContent: ep.plan.logline }),
+        el("ol", { style: "padding-left:18px;font-size:14px" }, ep.plan.beats.map((b) => el("li", { textContent: b.beat }))),
+        el("p", { style: "font-size:13px" }, el("strong", { textContent: "훅: " }), ep.plan.hook))
+        : el("p", { className: "muted", textContent: "아직 트리트먼트가 없습니다." }),
+      el("button", { className: "ghost tiny", style: "margin-top:8px", disabled: state.running,
+        textContent: ep.final ? "이 회차 다시 쓰기" : "이 회차 집필",
+        onclick: async () => {
+          if (!p.outline) return alert("회차표를 먼저 만드세요.");
+          if (ep.final && !confirm(`${n}화를 다시 씁니다. 기존 원고를 덮어씁니다.`)) return;
+          updateProject((x) => { x.episodes[n] = {}; });
+          state.running = true; setBadge("실행 중…", "warn"); state.tab = "work"; state.episode = null; render();
+          try { await writeEpisode(n); } catch (e) { log("error", e.message); }
+          finally { state.running = false; setBadge(""); render(); }
+        } })),
+    ep.qa ? el("div", { className: "card" },
+      el("h2", {}, "검수 ", el("span", { className: "tag " + (ep.qa.verdict === "pass" ? "ok" : "err"), textContent: ep.qa.verdict === "pass" ? "통과" : "퇴고 필요" })),
+      ep.qa.reasons.length ? el("div", { className: "err-box" }, ep.qa.reasons.map((r) => el("div", { textContent: r }))) : null,
+      el("div", {}, ep.qa.metrics.map((m) =>
+        el("div", { style: "display:flex;gap:8px;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--line)" },
+          el("span", { className: "tag " + (m.ok ? "ok" : m.level === "error" ? "err" : "warn"), textContent: m.ok ? "OK" : m.level === "error" ? "실패" : "경고" }),
+          el("div", { style: "min-width:0" },
+            el("div", { style: "font-size:13px" }, `${m.label} — ${m.value}`),
+            m.detail ? el("div", { className: "muted", style: "font-size:12px", textContent: m.detail }) : null)))),
+      ep.qa.judge ? el("p", { className: "muted", style: "font-size:13px", textContent:
+        `AI 심사 — 몰입 ${ep.qa.judge.scores.immersion} / 캐릭터 ${ep.qa.judge.scores.characterConsistency} / 문장 ${ep.qa.judge.scores.prose} / 훅 ${ep.qa.judge.scores.hook} / 명료 ${ep.qa.judge.scores.clarity}` }) : null) : null);
+
+  const right = el("div", { className: "card" },
+    el("div", { className: "row" },
+      el("h2", { style: "margin:0", textContent: ep.final ? "확정 원고" : "초고" }),
+      el("span", { className: "muted", textContent: `${num(text.length)}자` }),
+      el("div", { className: "spacer" }),
+      el("button", { className: "tiny", textContent: "저장", onclick: () => {
+        if (!editor.value.trim()) return alert("빈 원고는 저장할 수 없습니다.");
+        updateProject((x) => { x.episodes[n] = Object.assign(x.episodes[n] || {}, { final: editor.value.trim(), draft: editor.value.trim(), status: "final" }); });
+        render();
+      } })),
+    el("p", { className: "muted", style: "font-size:12px", textContent: "여기서 고쳐 저장하면 확정 원고가 됩니다. 다음 회차가 이 내용을 이어받습니다." }),
+    text ? editor : el("p", { className: "muted", textContent: "아직 원고가 없습니다." }));
+
+  return el("div", { className: "split" }, left, right);
+}
+
+function bibleTab(p) {
+  if (!p.bible) return el("div", { className: "card muted", textContent: "설정집을 먼저 만드세요." });
+  const b = p.bible;
+  return [
+    el("div", { className: "card" }, el("h2", { textContent: "세계관" }), el("p", { textContent: b.world.setting }),
+      el("h3", { textContent: "절대 규칙" }), el("ul", { style: "padding-left:18px" }, b.world.rules.map((r) => el("li", { textContent: r }))),
+      b.taboos.length ? el("div", {}, el("h3", { textContent: "금기" }), el("ul", { style: "padding-left:18px" }, b.taboos.map((t) => el("li", { textContent: t })))) : null),
+    el("div", { className: "card" }, el("h2", { textContent: `인물 ${b.characters.length}명` }),
+      el("div", { className: "grid" }, b.characters.map((c) =>
+        el("div", { style: "border:1px solid var(--line);border-radius:10px;padding:12px" },
+          el("strong", { textContent: `${c.name}${c.aka ? ` (${c.aka})` : ""}` }),
+          el("div", { className: "tag", textContent: c.role }),
+          el("p", { style: "font-size:13px;margin:8px 0 0", textContent: c.personality }),
+          el("p", { style: "font-size:13px;margin:6px 0 0" }, el("strong", { textContent: "말투: " }), c.speechStyle),
+          el("p", { style: "font-size:13px;margin:6px 0 0" }, el("strong", { textContent: "목표: " }), c.goal))))),
+    b.glossary.length ? el("div", { className: "card" }, el("h2", { textContent: "용어" }),
+      el("table", {}, el("tbody", {}, b.glossary.map((g) => el("tr", {}, el("td", { style: "width:150px" }, el("strong", { textContent: g.term })), el("td", { className: "muted", textContent: g.meaning })))))) : null,
+  ];
+}
+
+function canonTab(p) {
+  const open = p.foreshadow.filter((f) => !f.resolvedAt), closed = p.foreshadow.filter((f) => f.resolvedAt);
+  return [
+    el("div", { className: "card" }, el("h2", { textContent: `미회수 복선 ${open.length}건` }),
+      open.length ? el("table", {}, el("tbody", {}, open.map((f) => el("tr", {},
+        el("td", { style: "width:80px" }, el("span", { className: "tag warn", textContent: `${f.plantedAt}화` })),
+        el("td", {}, el("div", { textContent: f.description }), el("div", { className: "muted", style: "font-size:12px", textContent: `회수 계획: ${f.plannedPayoff}` })))))) : el("p", { className: "muted", textContent: "없음" }),
+      closed.length ? el("p", { className: "muted", style: "font-size:13px", textContent: `회수 완료 ${closed.length}건` }) : null),
+    el("div", { className: "card" }, el("h2", { textContent: `확정 사실 ${p.canon.length}건` }),
+      el("p", { className: "muted", style: "font-size:13px;margin-top:-6px", textContent: "다음 회차 집필에 그대로 주입됩니다." }),
+      el("div", { style: "max-height:420px;overflow:auto" }, el("table", {}, el("tbody", {}, p.canon.slice().reverse().map((f) =>
+        el("tr", {}, el("td", { style: "width:64px" }, el("span", { className: "tag", textContent: `${f.episode}화` })),
+          el("td", { style: "width:64px" }, el("span", { className: "muted", textContent: f.category })), el("td", { textContent: f.text }))))))),
+    p.states.length ? el("div", { className: "card" }, el("h2", { textContent: "인물 현재 상태" }),
+      el("table", {}, el("tbody", {}, p.states.map((s) => el("tr", {},
+        el("td", { style: "width:110px" }, el("strong", { textContent: s.name })),
+        el("td", {}, el("div", { textContent: `${s.state} · ${s.location}` }),
+          s.knows.length ? el("div", { className: "muted", style: "font-size:12px", textContent: `알고 있음: ${s.knows.join(", ")}` }) : null)))))) : null,
+  ];
+}
+
+function render() {
+  const app = $("app");
+  const logLines = $("logBox") ? [...$("logBox").children].map((c) => [c.className, c.textContent]) : [];
+  app.innerHTML = "";
+  const p = currentProject();
+  if (!p) {
+    app.append(el("div", { className: "card" },
+      el("h2", { textContent: "시작하기" }),
+      el("ol", { style: "padding-left:20px;line-height:2" },
+        el("li", {}, "오른쪽 위 ", el("code", { textContent: "설정" }), " 에서 API 키를 넣습니다."),
+        el("li", {}, el("code", { textContent: "새 작품" }), " 을 눌러 한 줄 아이디어를 적습니다."),
+        el("li", {}, "‘연재 진행’ 을 누르면 기획 → 설정집 → 회차표 → 집필까지 알아서 진행됩니다.")),
+      el("p", { className: "muted", style: "font-size:13px", textContent: "모든 데이터는 이 브라우저에만 저장됩니다. 서버로 보내지 않습니다." })));
+    return;
+  }
+  app.append(tabsBar());
+  const view = state.tab === "work" ? workTab(p) : state.tab === "episodes" ? episodesTab(p) : state.tab === "bible" ? bibleTab(p) : canonTab(p);
+  for (const node of [view].flat()) if (node) app.append(node);
+  const box = $("logBox");
+  if (box) for (const [cls, txt] of logLines) box.append(el("div", { className: cls, textContent: txt }));
+  if (box) box.scrollTop = box.scrollHeight;
+}
+
+function refreshPicker() {
+  const all = loadProjects(), picker = $("picker");
+  picker.innerHTML = "";
+  const ids = Object.keys(all);
+  if (!ids.length) { picker.append(el("option", { textContent: "작품 없음" })); return; }
+  for (const id of ids) picker.append(el("option", { value: id, textContent: all[id].title }));
+  if (!all[state.id]) state.id = ids[0];
+  picker.value = state.id;
+}
+
+/* ── 설정 / 새 작품 ─────────────────────────────────────────── */
+function fillProviderSelect() {
+  const sel = $("s-provider");
+  sel.innerHTML = "";
+  for (const [id, v] of Object.entries(PROVIDERS)) sel.append(el("option", { value: id, textContent: v.label }));
+}
+function syncSettingsForm() {
+  const cfg = loadSettings(), v = PROVIDERS[cfg.provider];
+  $("s-provider").value = cfg.provider;
+  $("s-key").value = cfg.key;
+  $("s-model").value = cfg.model || v.defaultModel;
+  $("s-baseurl").value = cfg.baseUrl || v.defaultBaseUrl || "";
+  $("baseUrlWrap").style.display = cfg.provider === "openai" ? "" : "none";
+  $("corsNotice").innerHTML = `<strong>${v.label}</strong><br>${v.note}<br>키 발급: <a href="${v.keyUrl}" target="_blank" rel="noopener">${v.keyUrl}</a>`;
+}
+$("btnSettings").onclick = () => { fillProviderSelect(); syncSettingsForm(); $("testResult").textContent = ""; $("dlgSettings").showModal(); };
+$("s-provider").onchange = (e) => {
+  const v = PROVIDERS[e.target.value];
+  $("s-model").value = v.defaultModel;
+  $("s-baseurl").value = v.defaultBaseUrl || "";
+  $("baseUrlWrap").style.display = e.target.value === "openai" ? "" : "none";
+  $("corsNotice").innerHTML = `<strong>${v.label}</strong><br>${v.note}<br>키 발급: <a href="${v.keyUrl}" target="_blank" rel="noopener">${v.keyUrl}</a>`;
+};
+const readSettingsForm = () => ({ provider: $("s-provider").value, key: $("s-key").value.trim(), model: $("s-model").value.trim(), baseUrl: $("s-baseurl").value.trim() });
+$("btnSaveSettings").onclick = () => { saveSettings(readSettingsForm()); $("dlgSettings").close(); };
+$("btnCloseSettings").onclick = () => $("dlgSettings").close();
+$("btnTest").onclick = async () => {
+  saveSettings(readSettingsForm());
+  $("testResult").textContent = "테스트 중…";
+  try {
+    const out = await callModel({ system: ["짧게 한국어로 답한다."], user: "연결 확인용이다. '연결 성공' 이라고만 답하라.", maxTokens: 64 });
+    $("testResult").innerHTML = `<span style="color:var(--ok)">성공 — 모델 응답: ${out.slice(0, 40)}</span>`;
+  } catch (e) {
+    $("testResult").innerHTML = `<span style="color:var(--err)">${String(e.message).replace(/\n/g, "<br>")}</span>`;
+  }
+};
+
+$("btnNew").onclick = () => { $("newError").textContent = ""; $("dlgNew").showModal(); };
+$("btnCancelNew").onclick = () => $("dlgNew").close();
+$("btnCreate").onclick = () => {
+  const idea = $("n-idea").value.trim();
+  if (!idea) { $("newError").textContent = "아이디어를 한 줄 적어주세요."; return; }
+  const id = `p-${Date.now().toString(36)}`;
+  const p = {
+    id, title: $("n-title").value.trim() || idea.slice(0, 18), idea,
+    genre: $("n-genre").value.trim() || "현대판타지", platform: $("n-platform").value.trim() || "문피아",
+    reader: $("n-reader").value.trim() || "20~40대 남성 독자",
+    plannedEpisodes: Math.max(1, Number($("n-episodes").value) || 20),
+    charTarget: Math.max(800, Number($("n-chars").value) || 5200),
+    createdAt: nowIso(), concept: null, bible: null, outline: null,
+    episodes: {}, canon: [], foreshadow: [], states: [], usage: { calls: 0, in: 0, out: 0, cacheRead: 0, costUsd: 0 }, useJudge: true,
+  };
+  const all = loadProjects(); all[id] = p; saveProjects(all);
+  state.id = id; state.tab = "work"; state.episode = null;
+  $("dlgNew").close(); refreshPicker(); render();
+};
+$("picker").onchange = (e) => { state.id = e.target.value; state.episode = null; render(); };
+window.addEventListener("beforeunload", (e) => { if (state.running) { e.preventDefault(); e.returnValue = ""; } });
+
+refreshPicker();
+render();
+</script>
+</body>
+</html>

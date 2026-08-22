@@ -343,12 +343,13 @@ function episodeDetail(o) {
         textContent: d.qa.verdict === "pass" ? "통과" : "퇴고 필요" })),
       d.qa.reasons.length ? el("div", { className: "err-box" },
         d.qa.reasons.map((r) => el("div", { style: "font-size:13px", textContent: r }))) : null,
-      el("table", {}, el("tbody", {}, d.qa.metrics.filter((m) => m.level !== "info").map((m) =>
-        el("tr", { style: "cursor:default" },
-          el("td", {}, el("span", { className: "tag " + (m.ok ? "ok" : m.level === "error" ? "err" : "warn"),
-            textContent: m.ok ? "OK" : m.level === "error" ? "실패" : "경고" })),
-          el("td", { textContent: m.label }),
-          el("td", { className: "muted", textContent: `${m.value} ${m.detail}` }))))),
+      el("div", {}, d.qa.metrics.filter((m) => m.level !== "info").map((m) =>
+        el("div", { style: "display:flex;gap:8px;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--line)" },
+          el("span", { className: "tag " + (m.ok ? "ok" : m.level === "error" ? "err" : "warn"),
+            textContent: m.ok ? "OK" : m.level === "error" ? "실패" : "경고" }),
+          el("div", { style: "min-width:0" },
+            el("div", { style: "font-size:13px" }, `${m.label} — ${m.value}`),
+            m.detail ? el("div", { className: "muted", style: "font-size:12px", textContent: m.detail }) : null)))),
       d.qa.judge ? el("p", { className: "muted", style: "font-size:13px",
         textContent: `AI 심사 — 몰입 ${d.qa.judge.scores.immersion} / 캐릭터 ${d.qa.judge.scores.characterConsistency} / 문장 ${d.qa.judge.scores.prose} / 훅 ${d.qa.judge.scores.hook} / 명료 ${d.qa.judge.scores.clarity}` }) : null,
     ) : null);
