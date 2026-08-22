@@ -1,0 +1,27 @@
+{
+  "name": "websocial",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "자동화 웹소설 집필 파이프라인",
+  "bin": {
+    "novel": "src/cli.ts"
+  },
+  "scripts": {
+    "novel": "node src/cli.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/*.test.ts",
+    "check": "npm run typecheck && npm test"
+  },
+  "engines": {
+    "node": ">=22.6"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.120.0",
+    "zod": "^4.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "typescript": "^5.9.0"
+  }
+}
