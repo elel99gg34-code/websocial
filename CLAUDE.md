@@ -17,6 +17,7 @@ npm run check              # tsc --noEmit + node --test
 - `src/llm/` 제공자 어댑터(anthropic / openai-compat / gemini / mock) + 라우팅 엔진 + 단가표
 - `src/qa/` 규칙 기반 지표와 AI 심사 종합
 - `src/commands/` CLI 명령별 구현
+- `src/server/` 로컬 웹 UI 용 node:http API + 작업 러너. `web/index.html` 이 화면(의존성 0)
 - `prompts/*.md` 프롬프트 템플릿. **코드가 아니라 데이터다.** 문체 변경은 여기서.
 
 ## 지켜야 할 것

@@ -29,10 +29,12 @@
 - **멀티 제공자**: Claude(유료·고품질) + 무료 티어(Gemini/Groq/OpenRouter/Cerebras/Mistral) + 로컬(Ollama/LM Studio)
 - **단계별 모델 라우팅**: 집필은 Claude, 검수·요약은 무료 모델처럼 단계마다 다른 제공자 지정
 - 비용/토큰 회계, 예산 상한, 중단/재개, mock 모드(무과금 전체 파이프라인 리허설)
+- **로컬 웹 UI**(`novel serve`): 작품 생성·단계 실행·연재 진행 로그 실시간 확인·회차 원고 직접 편집
 
 ### v0.2 이후 (미구현 — 로드맵)
 - EPUB 내보내기, 문피아/노벨피아 등 플랫폼 업로드 자동화, 표지 생성
-- 웹 대시보드, 회차별 A/B 초고 비교, 독자 반응(댓글) 피드백 루프, 임베딩 기반 캐논 검색(RAG)
+- 회차별 A/B 초고 비교, 독자 반응(댓글) 피드백 루프, 임베딩 기반 캐논 검색(RAG)
+- 웹 UI 확장: 설정집 직접 편집, 캐논 수정, 프롬프트 편집기
 
 ### 명시적 비범위
 - 타 플랫폼 작품 크롤링/학습, 저작권 침해 소지가 있는 특정 작가 문체 복제, 표절 우회
@@ -221,6 +223,7 @@ Opus 5 기준 입력 $5 / 출력 $25 per 1M, 캐시 읽기 ≈ 0.1배.
 
 ```
 src/cli.ts ─┬─ commands/*.ts   (init·concept·bible·outline·write·qa·revise·run·status·export)
+            ├─ server/         node:http API + 작업 러너 → web/index.html (의존성 0, 빌드 0)
             ├─ core/           types(zod) · store(파일IO) · context(컨텍스트 조립)
             │                  canon(원장) · prompt(템플릿) · config · usage · log
             ├─ llm/            client(Anthropic 래퍼·재시도·캐싱·fallback) · mock · pricing
@@ -266,4 +269,5 @@ prompts/*.md   ← 프롬프트는 코드가 아니라 데이터. 작가가 직�
 - [x] 규칙 검수기·컨텍스트 조립기·저장소 단위 테스트 통과
 - [x] 회차별 산출물이 모두 파일로 남고, 중단 후 재실행 시 이어서 진행
 - [x] 무료 제공자 어댑터를 로컬 스텁 서버로 HTTP 왕복 검증 (키 없이)
+- [x] 로컬 웹 UI 전 화면 렌더 및 API 통합 검증
 - [ ] 실 API 키로 1~3화 생성 후 사람 검토 (← 키 제공 후 진행)

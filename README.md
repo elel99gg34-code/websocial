@@ -9,11 +9,25 @@
 
 자세한 설계 근거는 [docs/PLAN.md](docs/PLAN.md).
 
-## 빠른 시작
+## 빠른 시작 — 브라우저에서 (권장)
 
 ```bash
 npm install
 cp .env.example .env      # 쓸 제공자의 키만 채우면 된다
+npm run novel -- serve    # http://127.0.0.1:4173
+```
+
+브라우저에서 작품 생성 → 기획·설정집·회차표 만들기 → 연재 진행(진행 로그 실시간) →
+회차별 원고를 **직접 고쳐 저장**하는 것까지 전부 화면에서 된다. 고친 원고는 확정본이 되고
+다음 회차가 그 내용을 이어받는다.
+
+서버는 `127.0.0.1` 에만 바인딩되고 인증이 없다. 외부에 열지 마라.
+
+## 빠른 시작 — CLI
+
+```bash
+npm install
+cp .env.example .env
 
 npm run novel -- providers          # 어떤 제공자를 쓸 수 있는지 확인
 
@@ -79,6 +93,7 @@ npm run novel -- run 연습작 --to 3 --mock
 | `status` | 진행률·연속성 원장·누적 비용 |
 | `export --format txt\|md [--split]` | 확정 원고 내보내기 |
 | `providers` | 제공자 목록과 키 감지 상태 |
+| `serve [--port 4173]` | 브라우저 UI 를 localhost 에 띄운다 |
 
 공통 옵션: `--mock`(무과금) `--budget <USD>`(이번 실행 상한) `--force`(재생성) `--keep-going`(보류 회차 무시하고 계속)
 
@@ -128,3 +143,5 @@ npm run check       # 둘 다
   (22.6~22.17 은 `node --experimental-strip-types src/cli.ts` 로 실행해야 한다.)
 - 런타임 의존성은 `@anthropic-ai/sdk` 와 `zod` 둘뿐이다.
 - 무료 제공자 어댑터는 로컬 스텁 서버로 실제 HTTP 왕복을 테스트한다(API 키 불필요).
+- 웹 UI 는 의존성 없는 단일 HTML(`web/index.html`)이고, API 는 `src/server/` 의 `node:http` 서버다.
+  빌드도 번들러도 없다.

@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>websocial — 자동화 웹소설</title>
+<style>
+:root{
+  --bg:#faf9f7; --panel:#fff; --line:#e4e0d8; --text:#1c1a17; --muted:#6d675e;
+  --accent:#8a5a2b; --accent-soft:#f3ece3; --ok:#2f6b46; --warn:#9a6a12; --err:#a33a2a;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#16151a; --panel:#1e1d23; --line:#33313a; --text:#e9e6e1; --muted:#9b958c;
+    --accent:#d9a441; --accent-soft:#2a2620; --ok:#63b184; --warn:#d9a441; --err:#e0705c;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.65 -apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","Malgun Gothic",sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;flex-wrap:wrap;
+  padding:12px 20px;background:var(--panel);border-bottom:1px solid var(--line)}
+header h1{margin:0;font-size:17px;letter-spacing:-.02em}
+header h1 span{color:var(--muted);font-weight:400;font-size:13px;margin-left:8px}
+.spacer{flex:1}
+select,input[type=text],input[type=number],textarea{
+  background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 10px}
+textarea{width:100%;font:15px/2 inherit;resize:vertical}
+button{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:8px 14px;cursor:pointer}
+button.ghost{background:transparent;color:var(--accent);border:1px solid var(--line)}
+button:disabled{opacity:.45;cursor:not-allowed}
+main{max-width:1120px;margin:0 auto;padding:20px}
+nav{display:flex;gap:4px;margin-bottom:18px;flex-wrap:wrap}
+nav button{background:transparent;color:var(--muted);border-radius:8px;padding:7px 13px}
+nav button.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:16px}
+.card h2{margin:0 0 12px;font-size:15px;letter-spacing:-.01em}
+.card h3{margin:16px 0 6px;font-size:14px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+th{font-size:12px;color:var(--muted);font-weight:600}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:var(--accent-soft)}
+.tag{display:inline-block;white-space:nowrap;padding:2px 8px;border-radius:99px;font-size:12px;background:var(--accent-soft);color:var(--muted)}
+.tag.ok{color:var(--ok)} .tag.warn{color:var(--warn)} .tag.err{color:var(--err)}
+.muted{color:var(--muted)}
+.stat{font-size:24px;font-weight:600;letter-spacing:-.02em}
+.log{background:#0d0d10;color:#d7d3cc;border-radius:10px;padding:14px;height:260px;overflow:auto;
+  font:12.5px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;word-break:break-all}
+.log .step{color:#6fc3e8} .log .ok{color:#7fd6a0} .log .warn{color:#e8c56f} .log .error{color:#f08a76}
+.bar{height:6px;border-radius:99px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent)}
+.split{display:grid;gap:16px;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr)}
+@media(max-width:860px){.split{grid-template-columns:1fr}}
+.manuscript{white-space:pre-wrap;line-height:2;max-height:70vh;overflow:auto}
+.err-box{border-left:3px solid var(--err);padding-left:12px;margin:8px 0}
+.overflow{overflow-x:auto}
+dialog{border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--text);
+  padding:20px;max-width:560px;width:92vw}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+</style>
+</head>
+<body>
+<header>
+  <h1>websocial <span>자동화 웹소설</span></h1>
+  <select id="projectPicker"></select>
+  <button class="ghost" id="newProject">새 작품</button>
+  <div class="spacer"></div>
+  <span id="jobBadge" class="tag"></span>
+</header>
+<main id="app"><p class="muted">불러오는 중…</p></main>
+
+<dialog id="createDialog">
+  <h2 style="margin-top:0">새 작품</h2>
+  <div class="grid">
+    <div><label>프로젝트 이름(폴더명)</label><input type="text" id="f-slug" placeholder="회귀한-망나니"></div>
+    <div><label>제목</label><input type="text" id="f-title" placeholder="회귀한 망나니 도련님"></div>
+  </div>
+  <div style="margin-top:12px"><label>한 줄 아이디어 (필수)</label>
+    <input type="text" id="f-idea" placeholder="재벌가 망나니가 파산 직전으로 회귀해 그룹을 재건한다" style="width:100%"></div>
+  <div class="grid" style="margin-top:12px">
+    <div><label>장르</label><input type="text" id="f-genre" value="현대판타지"></div>
+    <div><label>플랫폼</label><input type="text" id="f-platform" value="문피아"></div>
+    <div><label>총 회차</label><input type="number" id="f-episodes" value="30" min="1"></div>
+    <div><label>회차 글자수</label><input type="number" id="f-chars" value="5200" min="500"></div>
+  </div>
+  <div style="margin-top:12px"><label>모델 구성</label>
+    <select id="f-mode" style="width:100%">
+      <option value="auto">자동 감지 (설정된 키로 결정)</option>
+      <option value="mixed">mixed — 집필은 Claude, 검수는 무료</option>
+      <option value="claude">claude — 전 단계 Claude</option>
+      <option value="free">free — 전 단계 무료 티어</option>
+      <option value="mock">mock — 호출 없이 구조만</option>
+    </select></div>
+  <div style="margin-top:12px"><label>제공자 직접 지정 (선택)</label>
+    <select id="f-provider" style="width:100%"><option value="">지정 안 함</option></select></div>
+  <p id="createError" class="muted" style="font-size:13px"></p>
+  <div class="row" style="margin-top:14px;justify-content:flex-end">
+    <button class="ghost" id="cancelCreate">취소</button>
+    <button id="doCreate">만들기</button>
+  </div>
+</dialog>
+
+<script type="module">
+const $ = (id) => document.getElementById(id);
+const el = (tag, props = {}, ...kids) => {
+  const node = Object.assign(document.createElement(tag), props);
+  for (const kid of kids.flat()) if (kid != null) node.append(kid);
+  return node;
+};
+const esc = (s) => String(s ?? "");
+const num = (n) => Number(n ?? 0).toLocaleString("ko-KR");
+
+async function api(path, options = {}) {
+  const res = await fetch(`/api${path}`, {
+    headers: { "content-type": "application/json" },
+    ...options,
+    body: options.body ? JSON.stringify(options.body) : undefined,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(`${data.error ?? "요청 실패"}${data.hint ? `\n${data.hint}` : ""}`);
+  return data;
+}
+
+const state = { slug: "", tab: "overview", overview: null, episode: null, job: null, seen: 0 };
+
+const STATUS = {
+  pending: ["대기", ""], planned: ["트리트먼트", ""], drafted: ["초고", ""],
+  revised: ["퇴고", ""], final: ["확정", "ok"], needs_human: ["사람 확인", "err"],
+};
+
+/* ── 프로젝트 목록 ─────────────────────────────────────── */
+async function loadProjects() {
+  const list = await api("/projects");
+  const picker = $("projectPicker");
+  picker.innerHTML = "";
+  for (const p of list) {
+    picker.append(el("option", { value: p.slug, textContent: `${p.title} (${p.finalCount}/${p.plannedEpisodes}화)` }));
+  }
+  if (list.length === 0) { picker.append(el("option", { textContent: "작품 없음" })); state.slug = ""; return list; }
+  if (!list.some((p) => p.slug === state.slug)) state.slug = list[0].slug;
+  picker.value = state.slug;
+  return list;
+}
+
+async function loadOverview() {
+  if (!state.slug) { state.overview = null; return; }
+  state.overview = await api(`/projects/${encodeURIComponent(state.slug)}`);
+}
+
+/* ── 실행 / 로그 ───────────────────────────────────────── */
+async function pollJob() {
+  try {
+    const { job } = await api(`/jobs/current?from=${state.seen}`);
+    const active = job ?? state.job;
+    if (job) {
+      if (state.job && state.job.id === job.id) {
+        state.job = { ...job, lines: [...state.job.lines, ...job.lines] };
+      } else {
+        state.job = job;
+      }
+      state.seen = state.job.total;
+      renderLog();
+    } else if (state.job && state.job.status === "running") {
+      const { job: done } = await api(`/jobs/${state.job.id}?from=${state.seen}`);
+      if (done) {
+        state.job = { ...done, lines: [...state.job.lines, ...done.lines] };
+        state.seen = done.total;
+      }
+      await refresh();
+    }
+    $("jobBadge").textContent = active && active.status === "running" ? "실행 중…" : "";
+    $("jobBadge").className = "tag" + (active && active.status === "running" ? " warn" : "");
+  } catch { /* 서버가 잠깐 응답 못 해도 폴링은 계속 */ }
+}
+setInterval(pollJob, 1200);
+
+function renderLog() {
+  const box = document.querySelector("#logBox");
+  if (!box) return;
+  if (!state.job) {
+    box.innerHTML = "";
+    box.append(el("div", { className: "muted",
+      textContent: "‘연재 진행’ 을 누르면 여기에 진행 상황이 실시간으로 찍힌다." }));
+    return;
+  }
+  box.innerHTML = "";
+  for (const line of state.job.lines) {
+    box.append(el("div", { className: line.level, textContent: line.message }));
+  }
+  box.scrollTop = box.scrollHeight;
+}
+
+async function startJob(path, body) {
+  try {
+    const { jobId } = await api(path, { method: "POST", body });
+    state.job = { id: jobId, status: "running", lines: [], total: 0 };
+    state.seen = 0;
+    render();
+  } catch (err) { alert(err.message); }
+}
+
+/* ── 탭 렌더 ───────────────────────────────────────────── */
+function tabs() {
+  const names = [["overview","개요"],["episodes","회차"],["bible","설정집"],["canon","연속성"]];
+  return el("nav", {}, names.map(([id, label]) =>
+    el("button", {
+      className: state.tab === id ? "on" : "",
+      textContent: label,
+      onclick: () => { state.tab = id; state.episode = null; render(); },
+    })));
+}
+
+function overviewTab(o) {
+  const done = o.episodes.filter((e) => e.status === "final").length;
+  const total = o.episodes.length || o.project.plannedEpisodes;
+  const mock = o.project.llm.routes.draft === "mock";
+
+  const stageCard = el("div", { className: "card" },
+    el("h2", { textContent: "1단계 · 준비" }),
+    el("div", { className: "grid" },
+      [["concept","기획"],["bible","설정집"],["outline","회차표"]].map(([id, label]) =>
+        el("div", {},
+          el("div", { className: "row" },
+            el("span", { textContent: label, style: "font-weight:600" }),
+            el("span", { className: "tag " + (o.stages[id] ? "ok" : ""), textContent: o.stages[id] ? "완료" : "미완" })),
+          el("button", {
+            className: "ghost", style: "margin-top:6px",
+            textContent: o.stages[id] ? "다시 만들기" : "만들기",
+            onclick: () => startJob(`/projects/${encodeURIComponent(state.slug)}/stage`,
+              { stage: id, mock: $("useMock").checked, force: o.stages[id], episodes: 0 }),
+          })))));
+
+  const runCard = el("div", { className: "card" },
+    el("h2", { textContent: "2단계 · 연재 진행" }),
+    el("p", { className: "muted", style: "margin-top:-6px;font-size:13px",
+      textContent: "이미 끝난 회차는 건너뛴다. 중간에 멈춰도 다시 누르면 이어서 진행한다." }),
+    el("div", { className: "grid" },
+      el("div", {}, el("label", { textContent: "몇 화까지" }),
+        el("input", { type: "number", id: "runTo", value: String(Math.min(done + 3, total) || 3), min: "1" })),
+      el("div", {}, el("label", { textContent: "예산 상한 (USD, 0=무제한)" }),
+        el("input", { type: "number", id: "runBudget", value: "5", min: "0", step: "1" })),
+      el("div", {}, el("label", { textContent: "옵션" }),
+        el("label", { className: "row", style: "font-size:14px;color:var(--text)" },
+          el("input", { type: "checkbox", id: "useMock", checked: mock }), "mock (무과금)"))),
+    el("div", { className: "row", style: "margin-top:12px" },
+      el("button", {
+        textContent: "연재 진행",
+        onclick: () => startJob(`/projects/${encodeURIComponent(state.slug)}/run`, {
+          to: Number($("runTo").value), budget: Number($("runBudget").value),
+          mock: $("useMock").checked, keepGoing: false,
+        }),
+      }),
+      el("button", {
+        className: "ghost", textContent: "원고 내보내기",
+        onclick: async () => {
+          try { await api(`/projects/${encodeURIComponent(state.slug)}/export`, { method: "POST", body: { format: "txt" } });
+            alert("projects/" + state.slug + "/exports/ 에 저장했습니다."); }
+          catch (err) { alert(err.message); }
+        },
+      })),
+    el("h3", { textContent: "진행 로그" }),
+    el("div", { className: "log", id: "logBox" }));
+
+  const statCard = el("div", { className: "card" },
+    el("h2", { textContent: "현황" }),
+    el("div", { className: "grid" },
+      el("div", {}, el("div", { className: "stat", textContent: `${done} / ${total}` }),
+        el("div", { className: "muted", textContent: "확정 회차" })),
+      el("div", {}, el("div", { className: "stat", textContent: `$${o.usage.costUsd.toFixed(3)}` }),
+        el("div", { className: "muted", textContent: `누적 비용 · 호출 ${o.usage.calls}회` })),
+      el("div", {}, el("div", { className: "stat", textContent: num(o.canon.length) }),
+        el("div", { className: "muted", textContent: "확정 사실" })),
+      el("div", {}, el("div", { className: "stat", textContent: num(o.foreshadow.filter((f) => f.resolvedAt === 0).length) }),
+        el("div", { className: "muted", textContent: "미회수 복선" }))),
+    el("div", { className: "bar", style: "margin-top:14px" },
+      el("i", { style: `width:${total ? (done / total) * 100 : 0}%` })),
+    el("h3", { textContent: "단계별 모델" }),
+    el("div", { className: "overflow" },
+      el("table", {}, el("tbody", {},
+        Object.entries(o.project.llm.routes).map(([stage, name]) => {
+          const p = o.project.llm.profiles[name];
+          return el("tr", { style: "cursor:default" },
+            el("td", { textContent: stage }),
+            el("td", { className: "muted", textContent: `${name} · ${p ? p.provider : "?"} / ${p ? p.model : "?"}` }));
+        })))));
+
+  return [statCard, stageCard, runCard];
+}
+
+function episodesTab(o) {
+  if (state.episode) return episodeDetail(o);
+  if (o.episodes.length === 0) {
+    return el("div", { className: "card muted", textContent: "회차표를 먼저 만드세요 (개요 탭)." });
+  }
+  return el("div", { className: "card overflow" },
+    el("h2", { textContent: "회차" }),
+    el("table", {},
+      el("thead", {}, el("tr", {},
+        ["번호","제목","상태","글자수","퇴고","비고"].map((h) => el("th", { textContent: h })))),
+      el("tbody", {}, o.episodes.map((e) => {
+        const [label, cls] = STATUS[e.status] ?? [e.status, ""];
+        return el("tr", { onclick: () => openEpisode(e.number) },
+          el("td", { textContent: `${e.number}화` }),
+          el("td", { textContent: e.title }),
+          el("td", {}, el("span", { className: `tag ${cls}`, textContent: label })),
+          el("td", { textContent: e.charCount ? num(e.charCount) : "-" }),
+          el("td", { textContent: e.revisions ? `${e.revisions}회` : "-" }),
+          el("td", { className: "muted", textContent: e.note }));
+      }))));
+}
+
+async function openEpisode(n) {
+  try {
+    state.episode = await api(`/projects/${encodeURIComponent(state.slug)}/episodes/${n}`);
+    render();
+  } catch (err) { alert(err.message); }
+}
+
+function episodeDetail(o) {
+  const d = state.episode;
+  const meta = o.episodes.find((e) => e.number === d.number);
+  const text = d.final || d.draft;
+
+  const left = el("div", {},
+    el("div", { className: "card" },
+      el("div", { className: "row" },
+        el("button", { className: "ghost", textContent: "← 목록", onclick: () => { state.episode = null; render(); } }),
+        el("strong", { textContent: `${d.number}화 ${meta ? meta.title : ""}` })),
+      d.plan ? el("div", {},
+        el("h3", { textContent: "트리트먼트" }),
+        el("p", { className: "muted", style: "font-size:13px", textContent: d.plan.logline }),
+        el("ol", { style: "padding-left:18px;font-size:14px" },
+          d.plan.beats.map((b) => el("li", { textContent: b.beat }))),
+        el("p", { style: "font-size:13px" }, el("strong", { textContent: "훅: " }), esc(d.plan.hook)),
+      ) : el("p", { className: "muted", textContent: "아직 트리트먼트가 없습니다." })),
+    d.qa ? el("div", { className: "card" },
+      el("h2", {}, "검수 ", el("span", { className: "tag " + (d.qa.verdict === "pass" ? "ok" : "err"),
+        textContent: d.qa.verdict === "pass" ? "통과" : "퇴고 필요" })),
+      d.qa.reasons.length ? el("div", { className: "err-box" },
+        d.qa.reasons.map((r) => el("div", { style: "font-size:13px", textContent: r }))) : null,
+      el("table", {}, el("tbody", {}, d.qa.metrics.filter((m) => m.level !== "info").map((m) =>
+        el("tr", { style: "cursor:default" },
+          el("td", {}, el("span", { className: "tag " + (m.ok ? "ok" : m.level === "error" ? "err" : "warn"),
+            textContent: m.ok ? "OK" : m.level === "error" ? "실패" : "경고" })),
+          el("td", { textContent: m.label }),
+          el("td", { className: "muted", textContent: `${m.value} ${m.detail}` }))))),
+      d.qa.judge ? el("p", { className: "muted", style: "font-size:13px",
+        textContent: `AI 심사 — 몰입 ${d.qa.judge.scores.immersion} / 캐릭터 ${d.qa.judge.scores.characterConsistency} / 문장 ${d.qa.judge.scores.prose} / 훅 ${d.qa.judge.scores.hook} / 명료 ${d.qa.judge.scores.clarity}` }) : null,
+    ) : null);
+
+  const editor = el("textarea", { value: text, rows: 26 });
+  const right = el("div", { className: "card" },
+    el("div", { className: "row" },
+      el("h2", { style: "margin:0", textContent: d.final ? "확정 원고" : "초고" }),
+      el("span", { className: "muted", textContent: `${num(text.length)}자` }),
+      el("div", { className: "spacer" }),
+      el("button", {
+        textContent: "저장",
+        onclick: async () => {
+          try {
+            await api(`/projects/${encodeURIComponent(state.slug)}/episodes/${d.number}`,
+              { method: "PUT", body: { text: editor.value } });
+            await refresh(); await openEpisode(d.number);
+          } catch (err) { alert(err.message); }
+        },
+      })),
+    el("p", { className: "muted", style: "font-size:12px",
+      textContent: "여기서 고쳐 저장하면 확정 원고가 된다. 다음 회차는 이 내용을 이어받는다." }),
+    editor);
+
+  return el("div", { className: "split" }, left, right);
+}
+
+function bibleTab(o) {
+  if (!o.bible) return el("div", { className: "card muted", textContent: "설정집을 먼저 만드세요." });
+  const b = o.bible;
+  return [
+    el("div", { className: "card" },
+      el("h2", { textContent: "세계관" }),
+      el("p", { textContent: b.world.setting }),
+      el("h3", { textContent: "절대 규칙" }),
+      el("ul", { style: "padding-left:18px" }, b.world.rules.map((r) => el("li", { textContent: r }))),
+      b.taboos.length ? el("div", {}, el("h3", { textContent: "금기" }),
+        el("ul", { style: "padding-left:18px" }, b.taboos.map((t) => el("li", { textContent: t })))) : null),
+    el("div", { className: "card" },
+      el("h2", { textContent: `인물 ${b.characters.length}명` }),
+      el("div", { className: "grid" }, b.characters.map((c) =>
+        el("div", { style: "border:1px solid var(--line);border-radius:10px;padding:12px" },
+          el("strong", { textContent: `${c.name} ${c.aka ? `(${c.aka})` : ""}` }),
+          el("div", { className: "tag", textContent: c.role }),
+          el("p", { style: "font-size:13px;margin:8px 0 0", textContent: c.personality }),
+          el("p", { style: "font-size:13px;margin:6px 0 0" },
+            el("strong", { textContent: "말투: " }), esc(c.speechStyle)),
+          el("p", { style: "font-size:13px;margin:6px 0 0" },
+            el("strong", { textContent: "목표: " }), esc(c.goal)))))),
+    b.glossary.length ? el("div", { className: "card" },
+      el("h2", { textContent: "용어" }),
+      el("table", {}, el("tbody", {}, b.glossary.map((g) =>
+        el("tr", { style: "cursor:default" },
+          el("td", { style: "width:160px" }, el("strong", { textContent: g.term })),
+          el("td", { className: "muted", textContent: g.meaning })))))) : null,
+  ];
+}
+
+function canonTab(o) {
+  const open = o.foreshadow.filter((f) => f.resolvedAt === 0);
+  const closed = o.foreshadow.filter((f) => f.resolvedAt !== 0);
+  return [
+    el("div", { className: "card" },
+      el("h2", { textContent: `미회수 복선 ${open.length}건` }),
+      open.length === 0 ? el("p", { className: "muted", textContent: "없음" }) :
+        el("table", {}, el("tbody", {}, open.map((f) =>
+          el("tr", { style: "cursor:default" },
+            el("td", { style: "width:90px" }, el("span", { className: "tag warn", textContent: `${f.plantedAt}화` })),
+            el("td", {}, el("div", { textContent: f.description }),
+              el("div", { className: "muted", style: "font-size:12px", textContent: `회수 계획: ${f.plannedPayoff}` })))))),
+      closed.length ? el("p", { className: "muted", style: "font-size:13px",
+        textContent: `회수 완료 ${closed.length}건: ${closed.map((f) => `${f.id}(${f.plantedAt}→${f.resolvedAt}화)`).join(", ")}` }) : null),
+    el("div", { className: "card" },
+      el("h2", { textContent: `확정 사실 ${o.canon.length}건` }),
+      el("p", { className: "muted", style: "font-size:13px;margin-top:-6px",
+        textContent: "다음 회차 집필에 그대로 주입된다. 틀린 게 있으면 canon.json 을 직접 고치면 된다." }),
+      el("div", { style: "max-height:420px;overflow:auto" },
+        el("table", {}, el("tbody", {}, o.canon.slice().reverse().map((f) =>
+          el("tr", { style: "cursor:default" },
+            el("td", { style: "width:70px" }, el("span", { className: "tag", textContent: `${f.episode}화` })),
+            el("td", { style: "width:70px" }, el("span", { className: "muted", textContent: f.category })),
+            el("td", { textContent: f.text }))))))),
+    o.characterStates.length ? el("div", { className: "card" },
+      el("h2", { textContent: "인물 현재 상태" }),
+      el("table", {}, el("tbody", {}, o.characterStates.map((s) =>
+        el("tr", { style: "cursor:default" },
+          el("td", { style: "width:120px" }, el("strong", { textContent: s.name })),
+          el("td", {}, el("div", { textContent: `${s.state} · ${s.location}` }),
+            s.knows.length ? el("div", { className: "muted", style: "font-size:12px",
+              textContent: `알고 있음: ${s.knows.join(", ")}` }) : null)))))) : null,
+  ];
+}
+
+/* ── 렌더 ─────────────────────────────────────────────── */
+function render() {
+  const app = $("app");
+  app.innerHTML = "";
+  if (!state.slug || !state.overview) {
+    app.append(el("div", { className: "card" },
+      el("h2", { textContent: "작품이 없습니다" }),
+      el("p", { className: "muted", textContent: "‘새 작품’ 을 눌러 한 줄 아이디어부터 시작하세요." })));
+    return;
+  }
+  app.append(tabs());
+  const o = state.overview;
+  const view = state.tab === "overview" ? overviewTab(o)
+    : state.tab === "episodes" ? episodesTab(o)
+    : state.tab === "bible" ? bibleTab(o)
+    : canonTab(o);
+  for (const node of [view].flat()) if (node) app.append(node);
+  renderLog();
+}
+
+async function refresh() {
+  await loadProjects();
+  await loadOverview();
+  render();
+}
+
+/* ── 새 작품 만들기 ───────────────────────────────────── */
+$("newProject").onclick = async () => {
+  const sel = $("f-provider");
+  if (sel.options.length <= 1) {
+    for (const p of await api("/providers")) {
+      sel.append(el("option", { value: p.id,
+        textContent: `${p.label} — ${p.ready ? "사용 가능" : "키 없음"}` }));
+    }
+  }
+  $("createDialog").showModal();
+};
+$("cancelCreate").onclick = () => $("createDialog").close();
+$("doCreate").onclick = async () => {
+  $("createError").textContent = "";
+  try {
+    const { slug } = await api("/projects", { method: "POST", body: {
+      slug: $("f-slug").value.trim(), title: $("f-title").value.trim(), idea: $("f-idea").value.trim(),
+      genre: $("f-genre").value.trim(), platform: $("f-platform").value.trim(),
+      episodes: Number($("f-episodes").value), charTarget: Number($("f-chars").value),
+      mode: $("f-mode").value, provider: $("f-provider").value,
+    } });
+    state.slug = slug; state.tab = "overview";
+    $("createDialog").close();
+    await refresh();
+  } catch (err) { $("createError").textContent = err.message; }
+};
+$("projectPicker").onchange = async (e) => {
+  state.slug = e.target.value; state.episode = null;
+  await loadOverview(); render();
+};
+
+refresh().catch((err) => { $("app").textContent = err.message; });
+</script>
+</body>
+</html>

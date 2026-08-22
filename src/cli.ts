@@ -23,6 +23,7 @@ import { cmdOutline } from "./commands/outline.ts";
 import { cmdProviders } from "./commands/providers.ts";
 import { cmdRun } from "./commands/run.ts";
 import { cmdStatus } from "./commands/status.ts";
+import { serve } from "./server/server.ts";
 import type { EpisodeContext } from "./commands/write.ts";
 import { qaEpisode, reviseEpisode, writeEpisode } from "./commands/write.ts";
 
@@ -41,8 +42,12 @@ const HELP = `
   revise <슬러그>    한 회차 퇴고       --ep <회차>
   run <슬러그>       기획~연재 자동 진행 --to <회차> [--from <회차>]
   status <슬러그>    진행/비용 현황
+  serve              브라우저 UI 를 localhost 에 띄운다  --port <포트>
   export <슬러그>    원고 내보내기      --format txt|md [--split]
   providers          제공자 목록과 키 감지 상태
+
+serve 옵션
+  --port <포트>      기본 4173. 127.0.0.1 에만 바인딩된다
 
 공통 옵션
   --mock             API 호출 없이 구조만 검증 (무과금)
@@ -60,6 +65,7 @@ init 옵션
   novel init 회귀한-망나니 --idea "재벌가 망나니가 파산 직전으로 회귀한다" --mode mixed
   novel run 회귀한-망나니 --to 10 --budget 20
   novel export 회귀한-망나니 --format txt
+  novel serve                          # http://127.0.0.1:4173
 `;
 
 const options = {
@@ -83,6 +89,7 @@ const options = {
   provider: { type: "string", default: "" },
   model: { type: "string", default: "" },
   format: { type: "string", default: "txt" },
+  port: { type: "string", default: "4173" },
 } as const;
 
 const MODES = new Set(["auto", "claude", "mixed", "free", "mock"]);
@@ -122,6 +129,10 @@ async function main(): Promise<void> {
   }
   if (command === "providers") {
     cmdProviders();
+    return;
+  }
+  if (command === "serve") {
+    await serve(Math.trunc(num(values.port, 4173)));
     return;
   }
 
