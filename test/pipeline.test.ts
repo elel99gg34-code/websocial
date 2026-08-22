@@ -64,6 +64,18 @@ test("이미 확정된 회차는 다시 만들지 않는다 (재개 가능)", ()
   assert.equal(fs.readFileSync(projectPath("episodes", "ep-0001", "final.md"), "utf8"), before);
 });
 
+test("outline --episodes 는 프로젝트 기본값을 덮어쓴다", () => {
+  const slug = "recount";
+  novel("init", slug, "--idea", "테스트", "--episodes", "3", "--mode", "mock");
+  novel("concept", slug, "--mock");
+  novel("bible", slug, "--mock");
+  novel("outline", slug, "--mock", "--episodes", "6");
+  const outline = JSON.parse(
+    fs.readFileSync(path.join(tmp, slug, "outline.json"), "utf8"),
+  ) as { episodes: unknown[] };
+  assert.equal(outline.episodes.length, 6);
+});
+
 test("status 는 진행률과 연속성 원장을 보여준다", () => {
   const output = novel("status", SLUG);
   assert.match(output, /회차 \(2\/3 확정\)/);

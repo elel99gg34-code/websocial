@@ -29,6 +29,7 @@ export async function cmdOutline(
     {
       stage: "outline",
       episode: 0,
+      mockCount: count,
       systemBlocks: [styleBlock(project), bibleBlock(bible)],
       user: renderPrompt("outline", {
         conceptBrief: conceptBrief(project, concept),

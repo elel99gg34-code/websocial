@@ -30,6 +30,7 @@ export type GenRequest = {
   maxOutputTokens?: number;
   /** mock 제공자만 사용하는 힌트 */
   mockChars?: number;
+  mockCount?: number;
 };
 
 export type ProseResult = { text: string; usage: RawUsage };

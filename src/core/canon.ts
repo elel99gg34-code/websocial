@@ -38,18 +38,19 @@ export const unresolvedForeshadow = (fs: Foreshadow): Foreshadow["items"] =>
 export function applyDigest(slug: string, episode: number, digest: Digest): void {
   const canon = loadCanon(slug);
   const known = new Set(canon.facts.map((f) => f.text.trim()));
-  digest.newFacts.forEach((fact, i) => {
+  for (const fact of digest.newFacts) {
     const text = fact.text.trim();
-    if (text === "" || known.has(text)) return;
+    if (text === "" || known.has(text)) continue;
     known.add(text);
     canon.facts.push({
-      id: `f-${episode}-${i + 1}`,
+      // 재실행(--force)으로 사실이 바뀌어도 id 가 겹치지 않도록 원장 전체 기준으로 매긴다
+      id: `f-${episode}-${canon.facts.length + 1}`,
       text,
       category: fact.category,
       characters: fact.characters,
       episode,
     });
-  });
+  }
   writeJson(projectFile.canon(slug), canon);
 
   const foreshadow = loadForeshadow(slug);

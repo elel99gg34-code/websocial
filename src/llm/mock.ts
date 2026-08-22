@@ -131,9 +131,11 @@ function fakeValue(node: Node, key: string, rnd: () => number, depth: number): u
 }
 
 /** 단계별로 의미가 있어야 하는 숫자/식별자를 보정한다 */
-function fixup(stage: string, value: unknown, req: GenRequest, episodes: number): unknown {
+function fixup(stage: string, value: unknown, req: GenRequest, fallbackEpisodes: number): unknown {
   if (typeof value !== "object" || value === null) return value;
   const obj = value as Node;
+
+  const episodes = req.mockCount ?? fallbackEpisodes;
 
   if (stage === "outline") {
     obj["arcs"] = [

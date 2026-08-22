@@ -67,6 +67,7 @@ export class AnthropicProvider implements Provider {
    */
   #system(blocks: string[]) {
     const used = blocks.filter((b) => b.trim().length > 0);
+    if (used.length === 0) return undefined;
     return used.map((text, i) => ({
       type: "text" as const,
       text,
