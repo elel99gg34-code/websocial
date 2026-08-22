@@ -62,6 +62,14 @@ tbody tr.click:hover{background:var(--soft)}
 dialog{border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--text);
   padding:20px;max-width:600px;width:93vw}
 dialog::backdrop{background:rgba(0,0,0,.5)}
+.prow{border:1px solid var(--line);border-radius:11px;padding:12px;margin-bottom:10px}
+.prow.on{border-color:var(--accent);background:var(--soft)}
+.prow .head{display:flex;gap:8px;align-items:center;justify-content:flex-start;cursor:pointer;margin:0}
+.prow .fields{display:grid;gap:9px;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));margin-top:9px}
+.prow .fields input{width:100%}
+.prow .head input[type=radio]{width:auto;flex:none;margin:0}
+.prow .head strong{font-size:15px}
+.prow .res{font-size:12.5px;margin-top:7px;line-height:1.6}
 .notice{background:var(--soft);border-radius:10px;padding:12px 14px;font-size:13px;line-height:1.7}
 code{background:var(--soft);padding:1px 5px;border-radius:5px;font-size:13px}
 </style>
@@ -77,27 +85,14 @@ code{background:var(--soft);padding:1px 5px;border-radius:5px;font-size:13px}
 </header>
 <main id="app"></main>
 
-<dialog id="dlgSettings">
+<dialog id="dlgSettings" style="max-width:760px">
   <h2 style="margin-top:0">API 설정</h2>
-  <div class="notice" id="corsNotice"></div>
-  <div style="margin-top:12px"><label>제공자</label>
-    <select id="s-provider" style="width:100%"></select></div>
-  <div style="margin-top:10px"><label>API 키</label>
-    <input type="password" id="s-key" style="width:100%" placeholder="sk-ant-... / AIza..."></div>
-  <div style="margin-top:10px"><label>모델</label>
-    <div class="row" style="flex-wrap:nowrap">
-      <input type="text" id="s-model" list="modelList" style="flex:1">
-      <button class="ghost tiny" id="btnModels" title="이 키로 쓸 수 있는 모델 목록을 불러옵니다">모델 목록</button>
-    </div>
-    <datalist id="modelList"></datalist></div>
-  <div style="margin-top:10px" id="baseUrlWrap"><label>Base URL (OpenAI 호환일 때)</label>
-    <input type="text" id="s-baseurl" style="width:100%"></div>
-  <p class="muted" style="font-size:12px;margin-top:12px">
-    키는 이 브라우저에만 저장됩니다(localStorage). 이 HTML 파일 안에는 들어가지 않으니
-    파일을 남에게 줘도 키는 따라가지 않습니다.</p>
-  <p id="testResult" style="font-size:13px"></p>
-  <div class="row" style="margin-top:12px;justify-content:flex-end">
-    <button class="ghost" id="btnTest">연결 테스트</button>
+  <p class="muted" style="font-size:13px;margin-top:-4px">
+    쓸 제공자의 키를 각각 넣어두세요. 한 번 넣으면 계속 저장되고, 왼쪽 동그라미로 지금 쓸 제공자를 고릅니다.<br>
+    키는 이 브라우저에만 저장되며 HTML 파일 안에는 들어가지 않습니다.</p>
+  <div id="providerRows"></div>
+  <div class="row" style="margin-top:14px;justify-content:flex-end">
+    <button class="ghost" id="btnCopyDebug" title="마지막 오류의 상세 내용을 복사합니다">오류 복사</button>
     <button class="ghost" id="btnCloseSettings">닫기</button>
     <button id="btnSaveSettings">저장</button>
   </div>
@@ -149,17 +144,17 @@ const PROVIDERS = {
   groq: {
     kind: "openai", label: "Groq — 무료 티어 · 매우 빠름", baseUrl: "https://api.groq.com/openai/v1",
     defaultModel: "llama-3.3-70b-versatile", keyUrl: "https://console.groq.com/keys",
-    note: "무료 티어가 있고 추론이 매우 빠릅니다. 브라우저 직접 호출 가능 여부는 확인하지 못했으니 아래 ‘연결 테스트’로 먼저 확인하세요.",
+    note: "무료 티어가 있고 추론이 매우 빠릅니다. 브라우저에서 직접 호출되는지는 확인하지 못했으니 아래 버튼으로 먼저 확인하세요.",
   },
   xai: {
     kind: "openai", label: "xAI Grok", baseUrl: "https://api.x.ai/v1",
     defaultModel: "grok-4", keyUrl: "https://console.x.ai/",
-    note: "OpenAI 호환 API 입니다. 모델명이 자주 바뀌니 ‘모델 목록’ 버튼으로 실제 쓸 수 있는 이름을 확인하세요.",
+    note: "OpenAI 호환 API 입니다. 모델명이 자주 바뀌니 아래 모델 목록 버튼으로 실제 쓸 수 있는 이름을 받아오세요.",
   },
   gemini: {
     kind: "gemini", label: "Google Gemini — 무료 티어", defaultModel: "gemini-2.5-flash",
     keyUrl: "https://aistudio.google.com/apikey",
-    note: "무료 티어가 있습니다. 브라우저 직접 호출 가능 여부는 확인하지 못했으니 ‘연결 테스트’로 먼저 확인하세요.",
+    note: "무료 티어가 있습니다. 브라우저에서 직접 호출되는지는 확인하지 못했으니 아래 버튼으로 먼저 확인하세요.",
   },
   openrouter: {
     kind: "openai", label: "OpenRouter — :free 모델은 무료", baseUrl: "https://openrouter.ai/api/v1",
@@ -498,130 +493,208 @@ const PRICE = { "claude-opus-5": [5, 25], "claude-opus-4-8": [5, 25], "claude-so
 
 let abortController = null;
 
+/** SSE 프레임을 읽는다. 제공자마다 줄바꿈이 \n 이거나 \r\n 이라 둘 다 받는다. */
 async function* sseFrames(res) {
   const reader = res.body.getReader();
   const dec = new TextDecoder();
   let buf = "";
+  const cut = () => {
+    const a = buf.indexOf("\n\n"), b = buf.indexOf("\r\n\r\n");
+    if (a < 0 && b < 0) return null;
+    if (b >= 0 && (a < 0 || b < a)) return [buf.slice(0, b), b + 4];
+    return [buf.slice(0, a), a + 2];
+  };
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
     buf += dec.decode(value, { stream: true });
-    let i;
-    while ((i = buf.indexOf("\n\n")) >= 0) {
-      const frame = buf.slice(0, i); buf = buf.slice(i + 2);
-      for (const line of frame.split("\n")) {
+    for (;;) {
+      const hit = cut();
+      if (!hit) break;
+      buf = buf.slice(hit[1]);
+      for (const line of hit[0].split(/\r?\n/)) {
         if (line.startsWith("data:")) yield line.slice(5).trim();
       }
     }
   }
+  for (const line of buf.split(/\r?\n/)) if (line.startsWith("data:")) yield line.slice(5).trim();
 }
 
 function friendlyError(err, provider) {
   const msg = String(err && err.message ? err.message : err);
-  if (/Failed to fetch|NetworkError|Load failed/i.test(msg)) {
-    return `${provider} 에 연결하지 못했습니다.\n` +
-      "원인은 보통 셋 중 하나입니다:\n" +
-      "1) API 키가 틀렸거나 비어 있음\n" +
-      "2) 이 제공자가 브라우저 직접 호출(CORS)을 막음 — 설정에서 Anthropic 으로 바꿔보세요\n" +
-      "3) 인터넷 연결 문제";
+  if (/Failed to fetch|NetworkError|Load failed|ERR_FAILED/i.test(msg)) {
+    return `${provider} 가 브라우저에서 오는 요청을 거부했습니다.\n` +
+      "키가 맞아도 이렇게 됩니다. 브라우저는 다른 사이트의 API 를 부를 때\n" +
+      "그 서버가 허락(CORS)해야만 통신하는데, 이 제공자는 허락하지 않습니다.\n\n" +
+      "해결책\n" +
+      "· Anthropic Claude 로 바꾸세요. 브라우저 호출을 허용하는 것을 확인했습니다.\n" +
+      "· 로컬 Ollama 를 쓴다면 OLLAMA_ORIGINS=* 로 띄우면 됩니다.\n" +
+      "· 이 제공자를 꼭 써야 한다면 서버판(novel serve)에서 쓰세요. 거기선 이 제한이 없습니다.";
   }
   return msg;
 }
 
-/** 한 번 호출한다. stream 이면 onDelta 로 조각을 흘려보낸다. */
-async function callModel({ system, user, maxTokens = 16000, onDelta = null }) {
-  const cfg = loadSettings();
+let lastDebug = "";
+
+/** 제공자별 요청 형태를 만든다. stream=false 면 비스트리밍 엔드포인트/본문을 쓴다. */
+function buildRequest(cfg, { system, user, maxTokens, stream }) {
+  const kind = kindOf(cfg.provider);
+  const blocks = system.filter((s) => s && s.trim());
+  if (kind === "anthropic") {
+    return {
+      url: "https://api.anthropic.com/v1/messages",
+      headers: {
+        "content-type": "application/json", "x-api-key": cfg.key,
+        "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true",
+      },
+      body: {
+        model: cfg.model, max_tokens: maxTokens, ...(stream ? { stream: true } : {}),
+        system: blocks.map((text, i) => ({
+          type: "text", text,
+          ...(i === blocks.length - 1 ? { cache_control: { type: "ephemeral" } } : {}),
+        })),
+        messages: [{ role: "user", content: user }],
+        thinking: { type: "adaptive" }, output_config: { effort: "high" },
+      },
+      delta: (d) => (d.type === "content_block_delta" && d.delta && d.delta.type === "text_delta" ? d.delta.text : ""),
+      usage: (d) => d.type === "message_start" ? { in: d.message.usage.input_tokens, cacheRead: d.message.usage.cache_read_input_tokens || 0 }
+        : d.type === "message_delta" && d.usage ? { out: d.usage.output_tokens } : null,
+      whole: (j) => ({
+        text: (j.content || []).filter((b) => b.type === "text").map((b) => b.text).join(""),
+        usage: { in: (j.usage || {}).input_tokens || 0, out: (j.usage || {}).output_tokens || 0, cacheRead: (j.usage || {}).cache_read_input_tokens || 0 },
+        stop: j.stop_reason || "",
+      }),
+    };
+  }
+  if (kind === "gemini") {
+    const op = stream ? "streamGenerateContent?alt=sse" : "generateContent";
+    return {
+      url: `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(cfg.model)}:${op}`,
+      headers: { "content-type": "application/json", "x-goog-api-key": cfg.key },
+      body: {
+        ...(blocks.length ? { systemInstruction: { parts: [{ text: blocks.join("\n\n") }] } } : {}),
+        contents: [{ role: "user", parts: [{ text: user }] }],
+        generationConfig: { maxOutputTokens: maxTokens },
+      },
+      delta: (d) => {
+        const c = d.candidates && d.candidates[0];
+        const parts = c && c.content && c.content.parts;
+        return parts ? parts.map((p) => p.text || "").join("") : "";
+      },
+      usage: (d) => (d.usageMetadata ? { in: d.usageMetadata.promptTokenCount || 0, out: d.usageMetadata.candidatesTokenCount || 0 } : null),
+      whole: (j) => {
+        const c = (j.candidates || [])[0] || {};
+        return {
+          text: ((c.content || {}).parts || []).map((p) => p.text || "").join(""),
+          usage: { in: (j.usageMetadata || {}).promptTokenCount || 0, out: (j.usageMetadata || {}).candidatesTokenCount || 0, cacheRead: 0 },
+          stop: c.finishReason || (j.promptFeedback || {}).blockReason || "",
+        };
+      },
+    };
+  }
+  const base = baseUrlOf(cfg) || "https://openrouter.ai/api/v1";
+  return {
+    url: `${base}/chat/completions`,
+    headers: { "content-type": "application/json", ...(cfg.key ? { authorization: `Bearer ${cfg.key}` } : {}) },
+    body: {
+      model: cfg.model, max_tokens: maxTokens, ...(stream ? { stream: true } : {}),
+      messages: [...(blocks.length ? [{ role: "system", content: blocks.join("\n\n") }] : []), { role: "user", content: user }],
+    },
+    delta: (d) => { const c = d.choices && d.choices[0]; return c && c.delta && c.delta.content ? c.delta.content : ""; },
+    usage: (d) => (d.usage ? { in: d.usage.prompt_tokens || 0, out: d.usage.completion_tokens || 0 } : null),
+    whole: (j) => {
+      const c = (j.choices || [])[0] || {};
+      return { text: (c.message || {}).content || "", usage: { in: (j.usage || {}).prompt_tokens || 0, out: (j.usage || {}).completion_tokens || 0, cacheRead: 0 }, stop: c.finish_reason || "" };
+    },
+  };
+}
+
+async function send(req, cfg, onDelta, signal) {
+  let res;
+  try {
+    res = await fetch(req.url, { method: "POST", headers: req.headers, body: JSON.stringify(req.body), signal });
+  } catch (err) {
+    if (err.name === "AbortError") throw err;
+    lastDebug = `fetch 실패\nURL: ${req.url}\n${err.message}`;
+    // Gemini 는 커스텀 헤더 때문에 사전 요청(preflight)이 생긴다.
+    // 키를 주소에 싣고 content-type 을 단순 형식으로 바꾸면 사전 요청 없이 시도할 수 있다.
+    if (kindOf(cfg.provider) === "gemini" && !req.retried) {
+      const url = req.url + (req.url.includes("?") ? "&" : "?") + "key=" + encodeURIComponent(cfg.key);
+      try {
+        res = await fetch(url, { method: "POST", headers: { "content-type": "text/plain;charset=UTF-8" }, body: JSON.stringify(req.body), signal });
+        lastDebug += "\n→ 사전 요청 없는 경로로 재시도해 성공";
+      } catch (err2) {
+        lastDebug += `\n→ 우회 경로도 실패: ${err2.message}`;
+        throw new Error(friendlyError(err, (PROVIDERS[cfg.provider] || {}).label || cfg.provider));
+      }
+    } else {
+      throw new Error(friendlyError(err, (PROVIDERS[cfg.provider] || {}).label || cfg.provider));
+    }
+  }
+  const raw = res.ok ? null : await res.text();
+  if (!res.ok) {
+    lastDebug = `HTTP ${res.status}\nURL: ${req.url}\n모델: ${cfg.model}\n응답: ${raw}`;
+    const tail = String(raw).slice(0, 600);
+    if (res.status === 401 || res.status === 403) throw new Error(`인증 실패(${res.status}). API 키를 확인하세요.\n${tail}`);
+    if (res.status === 404) throw new Error(`모델 또는 주소를 찾을 수 없습니다(404).\n모델: ${cfg.model}\n‘모델 목록’ 버튼으로 쓸 수 있는 이름을 확인하세요.\n${tail}`);
+    if (res.status === 429) throw new Error(`요청 한도 초과(429). 잠시 후 다시 시도하세요.\n${tail}`);
+    throw new Error(`HTTP ${res.status}\n${tail}`);
+  }
+
+  const usage = { in: 0, out: 0, cacheRead: 0 };
+  const ctype = res.headers.get("content-type") || "";
+  // 스트리밍을 요청했어도 제공자가 일반 JSON 을 돌려주는 경우가 있다
+  if (!/event-stream/i.test(ctype)) {
+    const j = await res.json();
+    if (j.error) { lastDebug = JSON.stringify(j).slice(0, 800); throw new Error(j.error.message || JSON.stringify(j.error)); }
+    const w = req.whole(j);
+    lastDebug = `비스트리밍 응답\nstop=${w.stop}\n길이=${w.text.length}\n${JSON.stringify(j).slice(0, 500)}`;
+    if (onDelta && w.text) onDelta(w.text, w.text);
+    return { text: w.text.trim(), usage: w.usage, stop: w.stop };
+  }
+
+  let out = "", stop = "";
+  for await (const data of sseFrames(res)) {
+    if (data === "[DONE]") break;
+    let d;
+    try { d = JSON.parse(data); } catch { continue; }
+    if (d.type === "error" || d.error) throw new Error((d.error && d.error.message) || "스트림 오류");
+    const piece = req.delta(d) || "";
+    if (piece) { out += piece; if (onDelta) onDelta(piece, out); }
+    const u = req.usage(d);
+    if (u) { usage.in += u.in || 0; usage.out += u.out || 0; usage.cacheRead += u.cacheRead || 0; }
+    const c = (d.candidates || [])[0];
+    if (c && c.finishReason) stop = c.finishReason;
+    if (d.type === "message_delta" && d.delta && d.delta.stop_reason) stop = d.delta.stop_reason;
+    if (d.promptFeedback && d.promptFeedback.blockReason) stop = d.promptFeedback.blockReason;
+  }
+  return { text: out.trim(), usage, stop };
+}
+
+/** 한 번 호출한다. 스트리밍이 빈 응답이면 비스트리밍으로 한 번 더 시도한다. */
+async function callModel({ system, user, maxTokens = 16000, onDelta = null, cfg = null }) {
+  cfg = cfg || loadSettings();
   if (!cfg.key && !/localhost|127\.0\.0\.1/.test(baseUrlOf(cfg))) throw new Error("설정에서 API 키를 먼저 넣으세요.");
   abortController = new AbortController();
   const signal = abortController.signal;
-  const blocks = system.filter((s) => s && s.trim());
-  let url, headers, body, pickDelta, pickUsage;
 
-  const kind = kindOf(cfg.provider);
-  if (kind === "anthropic") {
-    url = "https://api.anthropic.com/v1/messages";
-    headers = {
-      "content-type": "application/json",
-      "x-api-key": cfg.key,
-      "anthropic-version": "2023-06-01",
-      "anthropic-dangerous-direct-browser-access": "true",
-    };
-    body = {
-      model: cfg.model, max_tokens: maxTokens, stream: true,
-      system: blocks.map((text, i) => ({
-        type: "text", text,
-        ...(i === blocks.length - 1 ? { cache_control: { type: "ephemeral" } } : {}),
-      })),
-      messages: [{ role: "user", content: user }],
-      thinking: { type: "adaptive" },
-      output_config: { effort: "high" },
-    };
-    pickDelta = (d) => (d.type === "content_block_delta" && d.delta && d.delta.type === "text_delta" ? d.delta.text : "");
-    pickUsage = (d) =>
-      d.type === "message_start" ? { in: d.message.usage.input_tokens, cacheRead: d.message.usage.cache_read_input_tokens || 0 }
-      : d.type === "message_delta" && d.usage ? { out: d.usage.output_tokens } : null;
-  } else if (kind === "gemini") {
-    url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(cfg.model)}:streamGenerateContent?alt=sse`;
-    headers = { "content-type": "application/json", "x-goog-api-key": cfg.key };
-    body = {
-      systemInstruction: { parts: [{ text: blocks.join("\n\n") }] },
-      contents: [{ role: "user", parts: [{ text: user }] }],
-      generationConfig: { maxOutputTokens: maxTokens },
-    };
-    pickDelta = (d) => {
-      const parts = d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts;
-      return parts ? parts.map((p) => p.text || "").join("") : "";
-    };
-    pickUsage = (d) => (d.usageMetadata ? { in: d.usageMetadata.promptTokenCount || 0, out: d.usageMetadata.candidatesTokenCount || 0 } : null);
-  } else {
-    const base = baseUrlOf(cfg) || "https://openrouter.ai/api/v1";
-    url = `${base}/chat/completions`;
-    headers = { "content-type": "application/json" };
-    if (cfg.key) headers["authorization"] = `Bearer ${cfg.key}`;
-    body = {
-      model: cfg.model, max_tokens: maxTokens, stream: true,
-      messages: [
-        ...(blocks.length ? [{ role: "system", content: blocks.join("\n\n") }] : []),
-        { role: "user", content: user },
-      ],
-    };
-    pickDelta = (d) => {
-      const c = d.choices && d.choices[0];
-      return c && c.delta && c.delta.content ? c.delta.content : "";
-    };
-    pickUsage = (d) => (d.usage ? { in: d.usage.prompt_tokens || 0, out: d.usage.completion_tokens || 0 } : null);
-  }
-
-  let res;
-  try {
-    res = await fetch(url, { method: "POST", headers, body: JSON.stringify(body), signal });
-  } catch (err) {
-    if (err.name === "AbortError") throw err;
-    throw new Error(friendlyError(err, (PROVIDERS[cfg.provider] || {}).label || cfg.provider));
-  }
-  if (!res.ok) {
-    const text = await res.text();
-    if (res.status === 401 || res.status === 403) throw new Error(`인증 실패(${res.status}). API 키를 확인하세요.\n${text.slice(0, 300)}`);
-    if (res.status === 404) throw new Error(`모델을 찾을 수 없습니다(404). 설정의 모델명을 확인하세요: ${cfg.model}\n${text.slice(0, 300)}`);
-    if (res.status === 429) throw new Error(`요청 한도 초과(429). 잠시 후 다시 시도하세요.\n${text.slice(0, 300)}`);
-    throw new Error(`HTTP ${res.status}\n${text.slice(0, 500)}`);
-  }
-
-  let out = "";
-  const usage = { in: 0, out: 0, cacheRead: 0 };
-  for await (const data of sseFrames(res)) {
-    if (data === "[DONE]") break;
-    let parsed;
-    try { parsed = JSON.parse(data); } catch { continue; }
-    if (parsed.type === "error") throw new Error(parsed.error ? parsed.error.message : "스트림 오류");
-    const piece = pickDelta(parsed) || "";
-    if (piece) { out += piece; if (onDelta) onDelta(piece, out); }
-    const u = pickUsage(parsed);
-    if (u) { usage.in += u.in || 0; usage.out += u.out || 0; usage.cacheRead += u.cacheRead || 0; }
+  let r = await send(buildRequest(cfg, { system, user, maxTokens, stream: true }), cfg, onDelta, signal);
+  if (!r.text) {
+    log("warn", `스트리밍 응답이 비어 있어 일반 요청으로 다시 시도합니다. (stop=${r.stop || "?"})`);
+    r = await send(buildRequest(cfg, { system, user, maxTokens, stream: false }), cfg, onDelta, signal);
   }
   abortController = null;
-  recordUsage(usage);
-  return out.trim();
+  recordUsage(r.usage);
+
+  if (!r.text) {
+    const why = /SAFETY|PROHIBITED|BLOCK|refusal/i.test(r.stop)
+      ? `모델이 안전 정책상 응답을 거절했습니다 (${r.stop}). 소재 수위를 낮추거나 다른 제공자를 쓰세요.`
+      : /MAX_TOKENS|max_tokens|length/i.test(r.stop)
+        ? `출력 한도(${maxTokens} 토큰)에 걸려 본문이 나오지 않았습니다. 회차 글자수를 줄이거나 다른 모델을 쓰세요.`
+        : `모델이 빈 응답을 돌려줬습니다 (stop=${r.stop || "알 수 없음"}).`;
+    throw new Error(why);
+  }
+  return r.text;
 }
 
 /** 구조화 JSON 을 받아온다. 검증 실패 시 오류를 돌려주며 한 번 더 요청한다. */
@@ -707,8 +780,27 @@ function analyze(text, target, tolerance = 0.12) {
 
 /* ── 저장소 ──────────────────────────────────────────────────── */
 const SKEY = "websocial.settings", PKEY = "websocial.projects";
-const loadSettings = () => Object.assign({ provider: "anthropic", key: "", model: "claude-opus-5", baseUrl: "" }, JSON.parse(localStorage.getItem(SKEY) || "{}"));
-const saveSettings = (s) => localStorage.setItem(SKEY, JSON.stringify(s));
+
+/** { provider: 활성 제공자, entries: { <id>: {key, model, baseUrl} } } */
+function loadStore() {
+  const raw = JSON.parse(localStorage.getItem(SKEY) || "{}");
+  const store = { provider: raw.provider || "anthropic", entries: raw.entries || {} };
+  // 예전 버전(키 한 칸)에서 올라온 경우 활성 제공자 항목으로 옮긴다
+  if (!raw.entries && raw.key) store.entries[store.provider] = { key: raw.key, model: raw.model || "", baseUrl: raw.baseUrl || "" };
+  for (const [id, v] of Object.entries(PROVIDERS)) {
+    const e = store.entries[id] || {};
+    store.entries[id] = { key: e.key || "", model: e.model || v.defaultModel, baseUrl: e.baseUrl || v.baseUrl || "" };
+  }
+  if (!PROVIDERS[store.provider]) store.provider = "anthropic";
+  return store;
+}
+const saveStore = (st) => localStorage.setItem(SKEY, JSON.stringify(st));
+/** 지금 활성화된 제공자의 접속 정보 (호출 코드가 쓰는 형태) */
+function loadSettings() {
+  const st = loadStore();
+  const e = st.entries[st.provider];
+  return { provider: st.provider, key: e.key, model: e.model, baseUrl: e.baseUrl };
+}
 const loadProjects = () => JSON.parse(localStorage.getItem(PKEY) || "{}");
 function saveProjects(p) {
   try { localStorage.setItem(PKEY, JSON.stringify(p)); }
@@ -1181,75 +1273,120 @@ function refreshPicker() {
 }
 
 /* ── 설정 / 새 작품 ─────────────────────────────────────────── */
-function fillProviderSelect() {
-  const sel = $("s-provider");
-  sel.innerHTML = "";
-  for (const [id, v] of Object.entries(PROVIDERS)) sel.append(el("option", { value: id, textContent: v.label }));
-}
-function syncSettingsForm() {
-  const cfg = loadSettings(), v = PROVIDERS[cfg.provider];
-  $("s-provider").value = cfg.provider;
-  $("s-key").value = cfg.key;
-  $("s-model").value = cfg.model || v.defaultModel;
-  $("s-baseurl").value = cfg.baseUrl || v.baseUrl || "";
-  $("baseUrlWrap").style.display = kindOf(cfg.provider) === "openai" ? "" : "none";
-  $("corsNotice").innerHTML = `<strong>${v.label}</strong><br>${v.note}<br>키 발급: <a href="${v.keyUrl}" target="_blank" rel="noopener">${v.keyUrl}</a>`;
-}
-$("btnSettings").onclick = () => { fillProviderSelect(); syncSettingsForm(); $("testResult").textContent = ""; $("dlgSettings").showModal(); };
-$("s-provider").onchange = (e) => {
-  const v = PROVIDERS[e.target.value];
-  $("s-model").value = v.defaultModel;
-  $("s-baseurl").value = v.baseUrl || "";
-  $("baseUrlWrap").style.display = kindOf(e.target.value) === "openai" ? "" : "none";
-  $("corsNotice").innerHTML = `<strong>${v.label}</strong><br>${v.note}<br>키 발급: <a href="${v.keyUrl}" target="_blank" rel="noopener">${v.keyUrl}</a>`;
-};
-const readSettingsForm = () => ({ provider: $("s-provider").value, key: $("s-key").value.trim(), model: $("s-model").value.trim(), baseUrl: $("s-baseurl").value.trim() });
-$("btnSaveSettings").onclick = () => { saveSettings(readSettingsForm()); $("dlgSettings").close(); };
-$("btnCloseSettings").onclick = () => $("dlgSettings").close();
-$("btnTest").onclick = async () => {
-  saveSettings(readSettingsForm());
-  $("testResult").textContent = "테스트 중…";
-  try {
-    const out = await callModel({ system: ["짧게 한국어로 답한다."], user: "연결 확인용이다. '연결 성공' 이라고만 답하라.", maxTokens: 64 });
-    $("testResult").innerHTML = `<span style="color:var(--ok)">성공 — 모델 응답: ${out.slice(0, 40)}</span>`;
-  } catch (e) {
-    $("testResult").innerHTML = `<span style="color:var(--err)">${String(e.message).replace(/\n/g, "<br>")}</span>`;
-  }
-};
+const TIER = { anthropic: "유료", groq: "무료 티어", xai: "유료", gemini: "무료 티어", openrouter: "일부 무료", custom: "로컬 무료" };
 
-async function fetchModels() {
-  const cfg = readSettingsForm();
+/** 화면의 한 행에서 접속 정보를 읽는다 */
+function rowConfig(row) {
+  const id = row.dataset.id;
+  const get = (f) => { const i = row.querySelector(`[data-f="${f}"]`); return i ? i.value.trim() : ""; };
+  return { provider: id, key: get("key"), model: get("model") || PROVIDERS[id].defaultModel, baseUrl: get("baseUrl") };
+}
+
+function providerRow(id, entry, active) {
+  const v = PROVIDERS[id];
+  const isOpenAi = v.kind === "openai";
+  const res = el("div", { className: "res muted" });
+  const dl = el("datalist", { id: `ml-${id}` });
+
+  const mk = (f, label, value, placeholder = "") => {
+    const input = el("input", { type: f === "key" ? "password" : "text", value, placeholder });
+    input.dataset.f = f;
+    if (f === "model") input.setAttribute("list", `ml-${id}`);
+    return el("div", {}, el("label", { textContent: label }), input);
+  };
+
+  const row = el("div", { className: "prow" + (active ? " on" : "") },
+    el("label", { className: "head" },
+      el("input", { type: "radio", name: "activeProvider", value: id, checked: active,
+        onchange: () => { document.querySelectorAll(".prow").forEach((r) => r.classList.toggle("on", r.dataset.id === id)); } }),
+      el("strong", { textContent: v.label.split(" — ")[0] }),
+      el("span", { className: "tag", textContent: TIER[id] || "" })),
+    el("div", { className: "muted", style: "font-size:12px;margin-top:5px" }, v.note,
+      el("br"), "키 발급: ", el("a", { href: v.keyUrl, target: "_blank", rel: "noopener", textContent: v.keyUrl })),
+    el("div", { className: "fields" },
+      mk("key", "API 키", entry.key, id === "custom" ? "로컬 모델이면 비워두세요" : "여기에 붙여넣기"),
+      isOpenAi ? mk("baseUrl", "Base URL", entry.baseUrl || v.baseUrl || "") : null,
+      mk("model", "모델", entry.model || v.defaultModel)),
+    dl,
+    el("div", { className: "row", style: "margin-top:9px" },
+      el("button", { className: "ghost tiny", textContent: "연결 테스트", onclick: async (e) => {
+        const btn = e.target; btn.disabled = true;
+        res.className = "res muted"; res.textContent = "테스트 중…";
+        try {
+          const out = await callModel({ cfg: rowConfig(row), system: ["짧게 한국어로 답한다."], user: "연결 확인용이다. '연결 성공' 이라고만 답하라.", maxTokens: 2048 });
+          res.className = "res"; res.style.color = "var(--ok)";
+          res.textContent = `성공 — 모델 응답: ${out.slice(0, 40)}`;
+        } catch (err) {
+          res.className = "res"; res.style.color = "var(--err)";
+          res.innerHTML = String(err.message).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/\n/g, "<br>");
+        } finally { btn.disabled = false; }
+      } }),
+      el("button", { className: "ghost tiny", textContent: "모델 목록", onclick: async (e) => {
+        const btn = e.target; btn.disabled = true;
+        res.className = "res muted"; res.textContent = "모델 목록 불러오는 중…";
+        try {
+          const ids = await fetchModels(rowConfig(row));
+          dl.innerHTML = "";
+          for (const m of ids) dl.append(el("option", { value: m }));
+          res.className = "res"; res.style.color = "var(--ok)";
+          res.textContent = `모델 ${ids.length}개 — 모델 칸을 클릭하면 목록이 뜹니다. (${ids.slice(0, 8).join(", ")}${ids.length > 8 ? " …" : ""})`;
+        } catch (err) {
+          res.className = "res"; res.style.color = "var(--err)";
+          res.innerHTML = String(err.message).replace(/</g, "&lt;").replace(/\n/g, "<br>");
+        } finally { btn.disabled = false; }
+      } })),
+    res);
+  row.dataset.id = id;
+  return row;
+}
+
+function renderProviderRows() {
+  const st = loadStore();
+  const box = $("providerRows");
+  box.innerHTML = "";
+  for (const id of Object.keys(PROVIDERS)) box.append(providerRow(id, st.entries[id], id === st.provider));
+}
+
+function collectRows() {
+  const st = { provider: loadStore().provider, entries: {} };
+  for (const row of document.querySelectorAll(".prow")) {
+    const c = rowConfig(row);
+    st.entries[c.provider] = { key: c.key, model: c.model, baseUrl: c.baseUrl };
+    if (row.querySelector('input[type="radio"]').checked) st.provider = c.provider;
+  }
+  return st;
+}
+
+async function fetchModels(cfg) {
   const kind = kindOf(cfg.provider);
   let url, headers = {};
   if (kind === "anthropic") {
     url = "https://api.anthropic.com/v1/models?limit=100";
     headers = { "x-api-key": cfg.key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" };
   } else if (kind === "gemini") {
-    url = "https://generativelanguage.googleapis.com/v1beta/models";
-    headers = { "x-goog-api-key": cfg.key };
+    url = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(cfg.key)}`;
   } else {
     url = `${(cfg.baseUrl || PROVIDERS[cfg.provider].baseUrl || "").replace(/\/+$/, "")}/models`;
     if (cfg.key) headers["authorization"] = `Bearer ${cfg.key}`;
   }
-  const res = await fetch(url, { headers });
-  if (!res.ok) throw new Error(`HTTP ${res.status} — ${(await res.text()).slice(0, 200)}`);
+  let res;
+  try { res = await fetch(url, { headers }); }
+  catch (err) { lastDebug = `모델 목록 fetch 실패\nURL: ${url}\n${err.message}`; throw new Error(friendlyError(err, PROVIDERS[cfg.provider].label)); }
+  if (!res.ok) { const t = await res.text(); lastDebug = `모델 목록 HTTP ${res.status}\n${t.slice(0, 500)}`; throw new Error(`HTTP ${res.status} — ${t.slice(0, 200)}`); }
   const j = await res.json();
   const ids = (j.data || j.models || []).map((m) => String(m.id || m.name || "").replace(/^models\//, "")).filter(Boolean);
   if (!ids.length) throw new Error("모델 목록이 비어 있습니다.");
   return ids.sort();
 }
-$("btnModels").onclick = async () => {
-  $("testResult").textContent = "모델 목록 불러오는 중…";
-  try {
-    const ids = await fetchModels();
-    const dl = $("modelList");
-    dl.innerHTML = "";
-    for (const id of ids) dl.append(el("option", { value: id }));
-    $("testResult").innerHTML = `<span style="color:var(--ok)">모델 ${ids.length}개를 찾았습니다. 모델 칸을 클릭하면 목록이 뜹니다.</span><br>` +
-      `<span class="muted" style="font-size:12px">${ids.slice(0, 12).join(", ")}${ids.length > 12 ? " …" : ""}</span>`;
-  } catch (e) {
-    $("testResult").innerHTML = `<span style="color:var(--err)">모델 목록 실패 — ${String(e.message).replace(/\n/g, "<br>")}</span>`;
-  }
+
+$("btnSettings").onclick = () => { renderProviderRows(); $("dlgSettings").showModal(); };
+$("btnSaveSettings").onclick = () => { saveStore(collectRows()); $("dlgSettings").close(); };
+$("btnCloseSettings").onclick = () => $("dlgSettings").close();
+$("btnCopyDebug").onclick = async () => {
+  const cfg = loadSettings();
+  const text = `제공자: ${cfg.provider} / 모델: ${cfg.model}\nBase URL: ${baseUrlOf(cfg) || "(기본)"}\n페이지: ${location.protocol}\n브라우저: ${navigator.userAgent}\n\n${lastDebug || "(기록된 오류 없음)"}`;
+  try { await navigator.clipboard.writeText(text); alert("오류 상세를 클립보드에 복사했습니다. 그대로 붙여넣어 주세요."); }
+  catch { prompt("아래 내용을 복사해 주세요", text); }
 };
 
 $("btnNew").onclick = () => { $("newError").textContent = ""; $("dlgNew").showModal(); };
